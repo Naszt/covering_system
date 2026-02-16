@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><style>
+*{box-sizing:border-box;user-select:none}
+.body-tight{background:#f5f5f5;min-height:100vh;display:flex;justify-content:center;align-items:center;font-family:Segoe UI,Roboto,sans-serif;margin:0;padding:8px}
+.main{display:flex;gap:8px;background:#ffffff;border-radius:8px;padding:8px}
+.canvas-area{background:transparent;border-radius:6px;padding:6px}
+.info{display:flex;justify-content:space-between;margin-bottom:6px;color:#333;padding:0 6px}
+.count{background:transparent;padding:1px 6px;border-radius:10px;color:#333;font-weight:600;font-size:1rem}
+.holder{position:relative;width:520px;height:520px;background:transparent;border-radius:6px}
+#canvas{position:absolute;top:10px;left:10px;width:500px;height:500px;background:#ffffff;border-radius:4px;border:1px solid #ccc;cursor:grab}
+#canvas:active{cursor:grabbing}
+.matrix{background:transparent;border-radius:6px;padding:4px;min-width:160px;max-height:520px;overflow:auto}
+.row{display:grid;grid-template-columns:repeat(9,20px);grid-gap:1px;margin-bottom:2px;justify-content:start}
+.btns{display:none}
+.btn{background:#e9e9e9;border:1px solid #cfcfcf;color:#111;width:20px;height:20px;border-radius:2px;font-weight:500;font-size:0.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.btn:active{transform:translateY(1px)}
+.btn.sel{background:#4a90e2;border-color:#4a90e2;color:#fff}
+.btn.dis{opacity:.4;pointer-events:none;background:#f0f0f0;border-color:#f0f0f0}
+.btn.zero{background:#dcdcdc;border-color:#dcdcdc;color:#666}
+.acts{display:flex;gap:4px;margin-top:8px;justify-content:center}
+.act{background:#4a90e2;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-weight:500;cursor:pointer}
+.act:active{transform:translateY(1px)}
+/* coverage badge and textarea */
+.coverage{background:transparent;color:#333;padding:0;margin:0;font-weight:600;font-size:1rem;line-height:1.2}
+textarea#rect-textarea{width:100%;box-sizing:border-box;height:140px;padding:6px;border-radius:6px;border:1px solid #ddd;font-family:Consolas,monospace;font-size:0.85rem;resize:vertical}
+</style></head>
+<body>
+<div class=main>
+  <div class=canvas-area>
+    <div class=info><span id="coverage" class="coverage">覆盖率: 0.00%</span><span class=count>元素个数: <span id=count>0</span></span></div>
+    <div class=holder><canvas id=canvas width=500 height=500></canvas></div>
+  </div>
+  <div class=matrix>
+    <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
+      <button class=act id=grid-decrease title="缩小网格">-</button>
+      <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id=grid-size>9×9</span></div>
+      <button class=act id=grid-increase title="扩大网格">+</button>
+    </div>
+    <div id=rows></div>
+    <div style="margin:8px 0">
+      <textarea id="rect-textarea" placeholder="在此编辑保存字符串，实时解析/更新"></textarea>
+    </div>
+    <div class=acts>
+      <button class=act id=clear>Clear</button>
+      <button class=act id=del>[D]elete</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),countSpan=document.getElementById('count');
+let rectangles=[],nextId=0,selectedId=null,isDragging=!1,dragOffset={x:0,y:0},currentShape={n:0,m:0,w:1,h:1};
+let clickSuppressed = false, downPos = null, hasMoved = false;
+let gridSize = 9; // gridSize x gridSize (0..gridSize-1)
+const GRID_LIMIT_MAX = 60;
+
+function updateCount(){
+  countSpan.innerText = rectangles.length;
+  try{ updateTextareaFromRects(); }catch(e){}
+  try{ updateCoverage(); }catch(e){}
+}
+const usedKeys=()=>new Set(rectangles.map(r=>r.n+','+r.m));
+
+function vPow(k,p,max){
+  if(k===0) return max;
+  let v=0; while(k%p===0){k/=p;v++;}
+  return v>max?max:v;
+}
+
+function drawFineGrid(){
+  const H = 3**5, V = 2**8;
+  ctx.save();
+  ctx.lineWidth = 0.5;
+  for(let k=0;k<H;k++){
+    let yFrac = k / H;
+    let cy = (1 - yFrac) * 500;
+    let v = vPow(k,3,5);
+    let alpha = 0.03 + (v/5) * 0.22;
+    ctx.strokeStyle = 'rgba(0,0,0,' + alpha + ')';
+    ctx.beginPath();
+    ctx.moveTo(0, Math.round(cy)+0.5);
+    ctx.lineTo(500, Math.round(cy)+0.5);
+    ctx.stroke();
+  }
+  for(let k=0;k<V;k++){
+    let xFrac = k / V;
+    let cx = xFrac * 500;
+    let v = vPow(k,2,8);
+    let alpha = 0.03 + (v/8) * 0.22;
+    ctx.strokeStyle = 'rgba(0,0,0,' + alpha + ')';
+    ctx.beginPath();
+    ctx.moveTo(Math.round(cx)+0.5, 0);
+    ctx.lineTo(Math.round(cx)+0.5, 500);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAll(){
+  ctx.clearRect(0,0,500,500);
+  drawFineGrid();
+  let selectedRect=rectangles.find(r=>r.id===selectedId);
+  let otherRects=rectangles.filter(r=>r.id!==selectedId);
+  otherRects.forEach(r=>drawRect(r,0));
+  selectedRect&&drawRect(selectedRect,1);
+  ctx.strokeStyle='#1f3b4f';ctx.lineWidth=4;ctx.strokeRect(0,0,500,500);
+}
+
+function drawRect(r,isSelected){
+  let {n,m,x,y}=r,w=500/2**n,h=500/3**m,px=x*500,py=(1-y-1/3**m)*500;
+  if(isSelected){
+    ctx.fillStyle='rgba(255,240,160,0.5)';ctx.fillRect(px,py,w,h);
+    ctx.strokeStyle='rgba(180,120,30,0.8)';ctx.lineWidth=4;
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(px+2,py+2,w-4,h-4);ctx.restore();
+  }else{
+    ctx.fillStyle='rgba(150,150,150,0.5)';ctx.fillRect(px,py,w,h);
+    ctx.strokeStyle=`hsla(${(n*37+m*73)%360},80%,60%,0.8)`;
+    ctx.lineWidth=4;
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(px+2,py+2,w-4,h-4);ctx.restore();
+  }
+}
+
+function findRectsAt(px,py){
+  let lx=px/500,ly=1-py/500;
+  return rectangles.filter(r=>{
+    let w=1/2**r.n,h=1/3**r.m;
+    return lx>=r.x&&lx<=r.x+w&&ly>=r.y&&ly<=r.y+h;
+  }).reverse();
+}
+
+function addRectangle(n,m,x,y,autoSelect=1){
+  let w=1/2**n,h=1/3**m;
+  if(x<0||y<0||x+w>1||y+h>1)return 0;
+  if(rectangles.some(r=>r.n===n&&r.m===m))return 0;
+  let id=nextId++;rectangles.push({id,n,m,x,y});
+  autoSelect&&(selectedId=id);updateCount();updateButtons();drawAll();return 1;
+}
+
+function moveRect(id,nx,ny){
+  let r=rectangles.find(r=>r.id===id);if(!r)return;
+  let w=1/2**r.n,h=1/3**r.m;
+  if(nx<0||ny<0||nx+w>1||ny+h>1)return;
+  r.x=nx;r.y=ny;drawAll();
+  try{ updateTextareaFromRects(); }catch(e){}
+  try{ updateCoverage(); }catch(e){}
+}
+
+function deleteSelected(){
+  if(selectedId!==null){
+    rectangles=rectangles.filter(r=>r.id!==selectedId);
+    selectedId=null;isDragging=0;updateCount();updateButtons();drawAll();
+  }
+}
+
+function clearAll(){
+  rectangles=[];selectedId=null;isDragging=0;updateCount();updateButtons();drawAll();
+}
+
+function updateButtons(){
+  let used=usedKeys();
+  document.querySelectorAll('.btn').forEach(b=>{
+    let n=Number(b.dataset.n),m=Number(b.dataset.m);
+    if(n===0 && m===0){ b.classList.add('dis'); return; }
+    used.has(n+','+m)?b.classList.add('dis'):b.classList.remove('dis');
+  });
+}
+
+function buildMatrix(){
+  let t=document.getElementById('rows');t.innerHTML='';
+  const rowsContainer = document.getElementById('rows');
+  const MAX_INDEX = gridSize - 1;
+  rowsContainer.innerHTML = '';
+  for(let m=0;m<=MAX_INDEX;m++){
+    let d=document.createElement('div');d.className='row';
+    d.style.gridTemplateColumns = 'repeat(' + gridSize + ',24px)';
+    for(let n=0;n<=MAX_INDEX;n++){
+      let b=document.createElement('button');
+      b.className='btn';b.dataset.n=n;b.dataset.m=m;
+      b.innerText=n+','+m;
+      b.onclick=()=>{
+        if(b.classList.contains('dis'))return;
+        document.querySelectorAll('.btn').forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');currentShape={n,m,w:1/2**n,h:1/3**m};
+      };
+      d.appendChild(b);
+    }
+    t.appendChild(d);
+  }
+  let f=document.querySelector('.btn[data-n="0"][data-m="0"]');
+  f&&f.classList.add('dis');currentShape={n:0,m:0,w:1,h:1};
+}
+
+function updateGridSizeDisplay(){
+  const el = document.getElementById('grid-size');
+  el && (el.innerText = gridSize + '×' + gridSize);
+}
+
+document.getElementById('grid-increase').addEventListener('click', ()=>{
+  if(gridSize >= GRID_LIMIT_MAX) return;
+  gridSize = Math.min(GRID_LIMIT_MAX, gridSize + 1);
+  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+});
+document.getElementById('grid-decrease').addEventListener('click', ()=>{
+  if(gridSize <= 1) return;
+  gridSize = Math.max(1, gridSize - 1);
+  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+});
+
+// wheel on matrix to expand/contract quickly (hold Shift for safety)
+document.querySelector('.matrix').addEventListener('wheel', e=>{
+  if(!e.shiftKey) return; // require Shift + wheel to change size
+  e.preventDefault();
+  if(e.deltaY < 0){ // zoom in
+    if(gridSize < GRID_LIMIT_MAX) gridSize++;
+  }else{
+    if(gridSize > 1) gridSize--;
+  }
+  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+});
+
+canvas.addEventListener('mousedown',e=>{
+  let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
+      x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;
+  
+  // 重置状态
+  downPos = {x: e.clientX, y: e.clientY};
+  hasMoved = false;
+  clickSuppressed = false;
+  
+  if(x<0||x>500||y<0||y>500){
+    selectedId=null;
+    drawAll();
+    return;
+  }
+  
+  let overlapped=findRectsAt(x,y);
+  
+  if(overlapped.length){
+    // 检查是否点击在已选择的矩形内
+    let clickedInSelected = false;
+    if(selectedId !== null){
+      let selectedRect = rectangles.find(r=>r.id===selectedId);
+      if(selectedRect){
+        let lx=x/500, ly=1-y/500;
+        let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
+        clickedInSelected = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
+                            ly >= selectedRect.y && ly <= selectedRect.y + h);
+      }
+    }
+    
+    if(selectedId === null || !clickedInSelected){
+      // 情况1: 未选择，或点击在选择的区域外 - 选择点击的矩形并开始拖动
+      selectedId = overlapped[0].id;
+      isDragging = true;
+      let lx=x/500, ly=1-y/500;
+      dragOffset.x = lx - overlapped[0].x;
+      dragOffset.y = ly - overlapped[0].y;
+    } else {
+      // 情况2: 点击在选择的区域内 - 准备拖动，但不立即切换选择
+      // 是否切换选择将在mouseup中根据是否移动决定
+      isDragging = true;
+      let lx=x/500, ly=1-y/500;
+      let selectedRect = rectangles.find(r=>r.id===selectedId);
+      if(selectedRect){
+        dragOffset.x = lx - selectedRect.x;
+        dragOffset.y = ly - selectedRect.y;
+      }
+    }
+    
+    drawAll();
+    e.preventDefault();
+  }else{
+    // 点击空白处：取消选择
+    selectedId=null;
+    drawAll();
+    
+    // 如果没有矩形被点击，尝试添加新矩形
+    if(!currentShape)return;
+    let n=currentShape.n,m=currentShape.m;
+    if(rectangles.some(r=>r.n===n&&r.m===m))return;
+    let stepsX=2**n,stepsY=3**m,lx=x/500,ly=1-y/500,
+        gridX=Math.floor(lx*stepsX)/stepsX,gridY=Math.floor(ly*stepsY)/stepsY;
+    gridX<0&&(gridX=0);gridY<0&&(gridY=0);
+    gridX+currentShape.w>1&&(gridX=1-currentShape.w);
+    gridY+currentShape.h>1&&(gridY=1-currentShape.h);
+    gridX=Math.round(gridX*stepsX)/stepsX;gridY=Math.round(gridY*stepsY)/stepsY;
+    addRectangle(n,m,gridX,gridY,1);
+  }
+});
+
+document.addEventListener('mousemove',e=>{
+  if(downPos){
+    const dx = Math.abs(e.clientX - downPos.x), dy = Math.abs(e.clientY - downPos.y);
+    if(dx > 4 || dy > 4) {
+      clickSuppressed = true;
+      hasMoved = true; // 标记已移动
+    }
+  }
+  
+  if(!isDragging||selectedId===null)return;
+  
+  e.preventDefault();
+  let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
+      x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s,
+      rr=rectangles.find(r=>r.id===selectedId);
+  if(!rr)return;
+  
+  let targetX=x/500-dragOffset.x,targetY=1-y/500-dragOffset.y,
+      stepsX=2**rr.n,stepsY=3**rr.m,
+      alignedX=Math.round(targetX*stepsX)/stepsX,alignedY=Math.round(targetY*stepsY)/stepsY,
+      w=1/2**rr.n,h=1/3**rr.m;
+  
+  alignedX<0&&(alignedX=0);alignedY<0&&(alignedY=0);
+  alignedX+w>1&&(alignedX=1-w);alignedY+h>1&&(alignedY=1-h);
+  alignedX=Math.round(alignedX*stepsX)/stepsX;alignedY=Math.round(alignedY*stepsY)/stepsY;
+  
+  moveRect(rr.id,alignedX,alignedY);
+});
+
+document.addEventListener('mouseup',()=>{
+  // 如果点击在已选择的矩形内且没有移动，切换到下一个矩形
+  if(!hasMoved && downPos && selectedId !== null){
+    // 获取点击位置
+    let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
+        x=(downPos.x-r.left)*s,y=(downPos.y-r.top)*s;
+    
+    if(x>=0 && x<=500 && y>=0 && y<=500){
+      let overlapped=findRectsAt(x,y);
+      
+      // 检查是否点击在已选择的矩形内
+      let clickedInSelected = false;
+      let selectedRect = rectangles.find(r=>r.id===selectedId);
+      if(selectedRect){
+        let lx=x/500, ly=1-y/500;
+        let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
+        clickedInSelected = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
+                            ly >= selectedRect.y && ly <= selectedRect.y + h);
+      }
+      
+      // 如果点击在已选择的矩形内且有多个矩形重叠，切换到下一个
+      if(clickedInSelected && overlapped.length > 1){
+        let idx = overlapped.findIndex(rr=>rr.id===selectedId);
+        if(idx !== -1){
+          // 切换到下一个矩形（循环）
+          selectedId = overlapped[(idx + 1) % overlapped.length].id;
+        }
+      }
+    }
+  }
+  
+  // 重置状态
+  isDragging = false;
+  downPos = null;
+  hasMoved = false;
+  drawAll();
+});
+
+canvas.addEventListener('wheel',e=>{
+  // wheel-based cycling disabled: use clicks to cycle through overlapped items
+  return;
+});
+
+
+canvas.addEventListener('dragstart',e=>e.preventDefault());
+
+window.addEventListener('keydown',e=>{
+  const k = e.key.toLowerCase();
+  if(k==='d'&&selectedId!==null){ deleteSelected(); e.preventDefault(); }
+  // Save/Load shortcuts removed; use右侧文本框实时同步
+});
+
+document.getElementById('clear').addEventListener('click',clearAll);
+document.getElementById('del').addEventListener('click',deleteSelected);
+
+document.addEventListener('mousedown',e=>{
+  const mainEl = document.querySelector('.main');
+  if(!mainEl || !mainEl.contains(e.target)){
+    selectedId=null;isDragging=0;drawAll();
+  }
+});
+document.addEventListener('mousedown',e=>{
+  if(e.target===canvas || canvas.contains(e.target)) return;
+  if(e.target.closest && (e.target.closest('.btn') || e.target.closest('.act') || e.target.closest('.acts') || e.target.closest('#rows'))) return;
+  selectedId=null;isDragging=0;drawAll();
+});
+
+function reverseBinary(num,n){
+  if(n===0) return 0;
+  let s = num.toString(2).padStart(n,'0').split('').reverse().join('');
+  return parseInt(s,2);
+}
+
+function reverseBaseDigits(num, base, len){
+  if(len===0) return 0;
+  let s = num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return parseInt(s, base);
+}
+
+function egcd(a,b){
+  if(b===0) return [1,0,a];
+  let [x,y,g]=egcd(b,a%b);
+  return [y, x - Math.floor(a/b)*y, g];
+}
+
+function modInv(a,m){
+  let [x,y,g]=egcd(a,m);
+  if(g!==1) return null;
+  x%=m; if(x<0) x+=m; return x;
+}
+
+function crtCombine(xrev,yrev,n,mPow){
+  const mod2 = 2**n, mod3 = 3**mPow, M = mod2*mod3;
+  if(mod2===1 && mod3===1) return 0;
+  if(mod2===1) return yrev%mod3;
+  if(mod3===1) return xrev%mod2;
+  const inv = modInv(mod2, mod3);
+  const k = ((yrev - xrev) % mod3 + mod3) % mod3;
+  const t = (xrev + (((k * inv) % mod3) * mod2)) % M;
+  return t;
+}
+
+function encodeRectToString(r){
+  const n=r.n, m=r.m;
+  const xi = Math.round(r.x * (2**n));
+  const yi = Math.round(r.y * (3**m));
+  const xrev = reverseBinary(xi,n);
+  const yrev = reverseBaseDigits(yi,3,m);
+  const t = crtCombine(xrev,yrev,n,m);
+  const M = (2**n)*(3**m);
+  return `${t}+${M}Z`;
+}
+
+// serialize rectangles to the string format used previously
+function serializeRects(){
+  return rectangles.map(encodeRectToString).join(',');
+}
+
+// will be toggled while programmatically writing to textarea
+let suppressTextarea = false;
+
+function updateTextareaFromRects(){
+  const ta = document.getElementById('rect-textarea');
+  if(!ta) return;
+  suppressTextarea = true;
+  ta.value = serializeRects();
+  suppressTextarea = false;
+}
+
+function updateCoverage(){
+  const covEl = document.getElementById('coverage');
+  if(!covEl) return;
+  // compute union area of axis-aligned rectangles on [0,1]^2
+  function computeUnionArea(rects){
+    if(!rects||rects.length===0) return 0;
+    // collect unique x edges
+    const xs = new Set();
+    rects.forEach(r=>{ xs.add(r.x); xs.add(r.x + (1/2**r.n)); });
+    const xsArr = Array.from(xs).sort((a,b)=>a-b);
+    let area = 0;
+    for(let i=0;i<xsArr.length-1;i++){
+      const x0 = xsArr[i], x1 = xsArr[i+1];
+      const dx = x1 - x0;
+      if(dx<=0) continue;
+      // gather y-intervals for rectangles that intersect this vertical strip
+      const intervals = [];
+      rects.forEach(r=>{
+        const rx0 = r.x, rx1 = r.x + (1/2**r.n);
+        if(rx1 <= x0 || rx0 >= x1) return; // no overlap
+        const y0 = r.y, y1 = r.y + (1/3**r.m);
+        intervals.push([y0,y1]);
+      });
+      if(intervals.length===0) continue;
+      intervals.sort((a,b)=>a[0]-b[0]);
+      // merge intervals and sum length
+      let mergedStart = intervals[0][0], mergedEnd = intervals[0][1], coveredY = 0;
+      for(let k=1;k<intervals.length;k++){
+        const s = intervals[k][0], e = intervals[k][1];
+        if(s <= mergedEnd){
+          if(e > mergedEnd) mergedEnd = e;
+        }else{
+          coveredY += Math.max(0, mergedEnd - mergedStart);
+          mergedStart = s; mergedEnd = e;
+        }
+      }
+      coveredY += Math.max(0, mergedEnd - mergedStart);
+      area += dx * coveredY;
+    }
+    if(area > 1) area = 1;
+    return area;
+  }
+
+  const area = computeUnionArea(rectangles || []);
+  covEl.innerText = '覆盖率: ' + (area*100).toFixed(2) + '%';
+}
+
+function parseTextareaAndLoad(){
+  const ta = document.getElementById('rect-textarea');
+  if(!ta) return;
+  if(suppressTextarea) return;
+  const raw = ta.value || '';
+  const parts = raw.split(',').map(p=>p.trim()).filter(Boolean);
+  // rebuild rectangles from textarea
+  rectangles = []; nextId = 0; selectedId = null; isDragging = 0;
+  for(const p of parts){
+    const parsed = parseEntryString(p);
+    if(parsed){ addRectangle(parsed.n, parsed.m, parsed.x, parsed.y, 0); }
+  }
+  updateButtons(); drawAll(); updateCount();
+}
+
+function parseEntryString(entry){
+  const m = entry.match(/^(\d+)\+(\d+)Z$/);
+  if(!m) return null;
+  const t = parseInt(m[1],10);
+  const M = parseInt(m[2],10);
+  let tmp = M, n=0, mPow=0;
+  while(tmp%2===0){ n++; tmp/=2; }
+  while(tmp%3===0){ mPow++; tmp/=3; }
+  if(tmp!==1) return null;
+  const mod2 = 2**n, mod3 = 3**mPow;
+  const xrev = mod2===1?0:(t % mod2);
+  const yrev = mod3===1?0:(t % mod3);
+  const xi = reverseBinary(xrev,n);
+  const yi = reverseBaseDigits(yrev,3,mPow);
+  const x = n===0?0:(xi / (2**n));
+  const y = mPow===0?0:(yi / (3**mPow));
+  return {n:n,m:mPow,x:x,y:y};
+}
+
+// loadAll removed: use textarea (实时编辑)
+
+// bind textarea for live sync and load default string
+const _ta = document.getElementById('rect-textarea');
+const DEFAULT_LOAD = '2+4Z,4+8Z,8+16Z,16+32Z,32+64Z,64+128Z,128+256Z,0+192Z,256+384Z,512+768Z,3+6Z,1+12Z,19+24Z,7+48Z,79+96Z,55+72Z,31+144Z,223+288Z,2+9Z,5+18Z,17+36Z,8+27Z,17+54Z,107+108Z';
+if(_ta){
+  _ta.addEventListener('input', ()=>{ parseTextareaAndLoad(); });
+  // initialize textarea with default string and parse it
+  suppressTextarea = true;
+  _ta.value = DEFAULT_LOAD;
+  suppressTextarea = false;
+  parseTextareaAndLoad();
+}
+
+buildMatrix();updateButtons();drawAll();updateCount();
+})();
+</script></body></html>

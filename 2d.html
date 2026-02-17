@@ -57,6 +57,62 @@ let clickedInSelectedAtDown = false; // 跟踪点击开始时是否在选择的�
 let gridSize = 9; // gridSize x gridSize (0..gridSize-1)
 const GRID_LIMIT_MAX = 60;
 
+// 视口系统：以左下角为原点，支持缩放和平移
+let viewport = {
+  x: 0,      // 视口左下角在逻辑坐标中的x位置
+  y: 0,      // 视口左下角在逻辑坐标中的y位置
+  scale: 1   // 缩放因子，1表示无缩放
+};
+const MIN_SCALE = 1;
+const MAX_SCALE = 10;
+let isPanning = false; // 是否正在平移
+let panStart = { x: 0, y: 0 }; // 平移开始时的鼠标位置
+let viewportStart = { x: 0, y: 0 }; // 平移开始时的视口位置
+
+// 将逻辑坐标转换为画布像素坐标
+function logicalToCanvas(logicalX, logicalY) {
+  // 逻辑坐标：左下角为原点，y轴向上
+  // 画布坐标：左上角为原点，y轴向下
+  const canvasX = (logicalX - viewport.x) * viewport.scale * 500;
+  const canvasY = 500 - (logicalY - viewport.y) * viewport.scale * 500;
+  return { x: canvasX, y: canvasY };
+}
+
+// 将画布像素坐标转换为逻辑坐标
+function canvasToLogical(canvasX, canvasY) {
+  // 画布坐标：左上角为原点，y轴向下
+  // 逻辑坐标：左下角为原点，y轴向上
+  const logicalX = viewport.x + (canvasX / 500) / viewport.scale;
+  const logicalY = viewport.y + (1 - canvasY / 500) / viewport.scale;
+  return { x: logicalX, y: logicalY };
+}
+
+// 检查视口是否超出边界
+function clampViewport() {
+  // 逻辑坐标范围是 [0,1] x [0,1]
+  // 视口显示的范围是 [viewport.x, viewport.x + 1/viewport.scale] x [viewport.y, viewport.y + 1/viewport.scale]
+  const viewWidth = 1 / viewport.scale;
+  const viewHeight = 1 / viewport.scale;
+  
+  // 不能超出左边界
+  if (viewport.x < 0) viewport.x = 0;
+  // 不能超出右边界
+  if (viewport.x + viewWidth > 1) viewport.x = 1 - viewWidth;
+  // 不能超出下边界
+  if (viewport.y < 0) viewport.y = 0;
+  // 不能超出上边界
+  if (viewport.y + viewHeight > 1) viewport.y = 1 - viewHeight;
+  
+  // 如果视口宽度大于1，则居中显示
+  if (viewWidth > 1) {
+    viewport.x = (1 - viewWidth) / 2;
+  }
+  // 如果视口高度大于1，则居中显示
+  if (viewHeight > 1) {
+    viewport.y = (1 - viewHeight) / 2;
+  }
+}
+
 function updateCount(){
   countSpan.innerText = rectangles.length;
   try{ updateTextareaFromRects(); }catch(e){}
@@ -110,21 +166,32 @@ function drawAll(){
 }
 
 function drawRect(r,isSelected){
-  let {n,m,x,y}=r,w=500/2**n,h=500/3**m,px=x*500,py=(1-y-1/3**m)*500;
+  let {n,m,x,y}=r;
+  // 逻辑坐标中的宽度和高度
+  let wLogical=1/2**n,hLogical=1/3**m;
+  // 转换为画布坐标
+  let topLeft = logicalToCanvas(x, y + hLogical); // 左上角
+  let bottomRight = logicalToCanvas(x + wLogical, y); // 右下角
+  let canvasW = bottomRight.x - topLeft.x;
+  let canvasH = bottomRight.y - topLeft.y;
+  
   if(isSelected){
-    ctx.fillStyle='rgba(255,240,160,0.5)';ctx.fillRect(px,py,w,h);
-    ctx.strokeStyle='rgba(180,120,30,0.8)';ctx.lineWidth=4;
-    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(px+2,py+2,w-4,h-4);ctx.restore();
+    ctx.fillStyle='rgba(255,240,160,0.5)';ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
+    ctx.strokeStyle='rgba(180,120,30,0.8)';ctx.lineWidth=2;
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(topLeft.x+1,topLeft.y+1,canvasW-2,canvasH-2);ctx.restore();
   }else{
-    ctx.fillStyle='rgba(150,150,150,0.5)';ctx.fillRect(px,py,w,h);
+    // 使用不同的混合模式，使叠加更明显
+    ctx.fillStyle='rgba(150,150,150,0.6)';ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
     ctx.strokeStyle=`hsla(${(n*37+m*73)%360},80%,60%,0.8)`;
-    ctx.lineWidth=4;
-    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(px+2,py+2,w-4,h-4);ctx.restore();
+    ctx.lineWidth=2;
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(topLeft.x+1,topLeft.y+1,canvasW-2,canvasH-2);ctx.restore();
   }
 }
 
 function findRectsAt(px,py){
-  let lx=px/500,ly=1-py/500;
+  // 将画布像素坐标转换为逻辑坐标
+  let logical = canvasToLogical(px, py);
+  let lx = logical.x, ly = logical.y;
   return rectangles.filter(r=>{
     let w=1/2**r.n,h=1/3**r.m;
     return lx>=r.x&&lx<=r.x+w&&ly>=r.y&&ly<=r.y+h;
@@ -193,6 +260,10 @@ function buildMatrix(){
         if(b.classList.contains('dis'))return;
         document.querySelectorAll('.btn').forEach(x=>x.classList.remove('sel'));
         b.classList.add('sel');currentShape={n,m,w:1/2**n,h:1/3**m};
+        // 取消矩形选择
+        selectedId = null;
+        isDragging = false;
+        drawAll();
       };
       d.appendChild(b);
     }
@@ -210,12 +281,18 @@ function updateGridSizeDisplay(){
 document.getElementById('grid-increase').addEventListener('click', ()=>{
   if(gridSize >= GRID_LIMIT_MAX) return;
   gridSize = Math.min(GRID_LIMIT_MAX, gridSize + 1);
-  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+  // 取消矩形选择
+  selectedId = null;
+  isDragging = false;
+  buildMatrix(); updateButtons(); updateGridSizeDisplay(); drawAll();
 });
 document.getElementById('grid-decrease').addEventListener('click', ()=>{
   if(gridSize <= 1) return;
   gridSize = Math.max(1, gridSize - 1);
-  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+  // 取消矩形选择
+  selectedId = null;
+  isDragging = false;
+  buildMatrix(); updateButtons(); updateGridSizeDisplay(); drawAll();
 });
 
 // wheel on matrix to expand/contract quickly (hold Shift for safety)
@@ -234,6 +311,9 @@ canvas.addEventListener('mousedown',e=>{
   let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
       x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;
   
+  // 检查是否按下了 Ctrl 或 Shift 键
+  const isCtrlOrShift = e.ctrlKey || e.shiftKey;
+  
   // 重置状态
   downPos = {x: e.clientX, y: e.clientY};
   hasMoved = false;
@@ -245,7 +325,9 @@ canvas.addEventListener('mousedown',e=>{
   if(selectedId !== null){
     let selectedRect = rectangles.find(r=>r.id===selectedId);
     if(selectedRect){
-      let lx=x/500, ly=1-y/500;
+      // 将画布像素坐标转换为逻辑坐标
+      let logicalPos = canvasToLogical(x, y);
+      let lx = logicalPos.x, ly = logicalPos.y;
       let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
       clickedInSelectedAtDown = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
                                 ly >= selectedRect.y && ly <= selectedRect.y + h);
@@ -263,26 +345,47 @@ canvas.addEventListener('mousedown',e=>{
     return;
   }
   
+  // 如果按下了 Ctrl 或 Shift 键，开始平移操作
+  if(isCtrlOrShift){
+    isPanning = true;
+    panStart.x = e.clientX;
+    panStart.y = e.clientY;
+    viewportStart.x = viewport.x;
+    viewportStart.y = viewport.y;
+    e.preventDefault();
+    return;
+  }
+  
   // 检查是否有按钮被选中（currentShape有效且不是(0,0)）
   let hasButtonSelected = currentShape && !(currentShape.n === 0 && currentShape.m === 0);
   
   if(hasButtonSelected){
     // 有按钮被选中，优先执行放置操作（创建新矩形）
-    let n=currentShape.n,m=currentShape.m;
+    // 保存currentShape的值，然后取消按钮选中状态
+    let savedShape = {n: currentShape.n, m: currentShape.m, w: currentShape.w, h: currentShape.h};
+    
+    // 取消按钮选中状态
+    deselectAllButtons();
+    
+    let n=savedShape.n,m=savedShape.m;
     // 检查是否已经存在相同类型的矩形
     if(rectangles.some(r=>r.n===n&&r.m===m))return;
-    let stepsX=2**n,stepsY=3**m,lx=x/500,ly=1-y/500,
+    
+    // 将画布像素坐标转换为逻辑坐标
+    let logicalPos = canvasToLogical(x, y);
+    let lx = logicalPos.x, ly = logicalPos.y;
+    
+    let stepsX=2**n,stepsY=3**m,
         gridX=Math.floor(lx*stepsX)/stepsX,gridY=Math.floor(ly*stepsY)/stepsY;
     gridX<0&&(gridX=0);gridY<0&&(gridY=0);
-    gridX+currentShape.w>1&&(gridX=1-currentShape.w);
-    gridY+currentShape.h>1&&(gridY=1-currentShape.h);
+    gridX+savedShape.w>1&&(gridX=1-savedShape.w);
+    gridY+savedShape.h>1&&(gridY=1-savedShape.h);
     gridX=Math.round(gridX*stepsX)/stepsX;gridY=Math.round(gridY*stepsY)/stepsY;
     
     // 添加新矩形
     if(addRectangle(n,m,gridX,gridY,1)){
       // 新矩形创建成功，准备拖动
       isDragging = true;
-      let lx=x/500, ly=1-y/500;
       let newRect = rectangles.find(r=>r.id===selectedId);
       if(newRect){
         dragOffset.x = lx - newRect.x;
@@ -302,7 +405,9 @@ canvas.addEventListener('mousedown',e=>{
       if(selectedId !== null){
         let selectedRect = rectangles.find(r=>r.id===selectedId);
         if(selectedRect){
-          let lx=x/500, ly=1-y/500;
+          // 将画布像素坐标转换为逻辑坐标
+          let logicalPos = canvasToLogical(x, y);
+          let lx = logicalPos.x, ly = logicalPos.y;
           let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
           clickedInSelected = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
                               ly >= selectedRect.y && ly <= selectedRect.y + h);
@@ -313,18 +418,20 @@ canvas.addEventListener('mousedown',e=>{
         // 情况1: 未选择，或点击在选择的区域外 - 选择点击的矩形并开始拖动
         selectedId = overlapped[0].id;
         isDragging = true;
-        let lx=x/500, ly=1-y/500;
-        dragOffset.x = lx - overlapped[0].x;
-        dragOffset.y = ly - overlapped[0].y;
+        // 将画布像素坐标转换为逻辑坐标
+        let logicalPos = canvasToLogical(x, y);
+        dragOffset.x = logicalPos.x - overlapped[0].x;
+        dragOffset.y = logicalPos.y - overlapped[0].y;
       } else {
         // 情况2: 点击在选择的区域内 - 准备拖动，但不立即切换选择
         // 是否切换选择将在mouseup中根据是否移动决定
         isDragging = true;
-        let lx=x/500, ly=1-y/500;
+        // 将画布像素坐标转换为逻辑坐标
+        let logicalPos = canvasToLogical(x, y);
         let selectedRect = rectangles.find(r=>r.id===selectedId);
         if(selectedRect){
-          dragOffset.x = lx - selectedRect.x;
-          dragOffset.y = ly - selectedRect.y;
+          dragOffset.x = logicalPos.x - selectedRect.x;
+          dragOffset.y = logicalPos.y - selectedRect.y;
         }
       }
       
@@ -342,7 +449,10 @@ canvas.addEventListener('mousedown',e=>{
       // 检查是否是(0,0)元素，如果是则不允许添加
       if(n === 0 && m === 0) return;
       if(rectangles.some(r=>r.n===n&&r.m===m))return;
-      let stepsX=2**n,stepsY=3**m,lx=x/500,ly=1-y/500,
+      // 将画布像素坐标转换为逻辑坐标
+      let logicalPos = canvasToLogical(x, y);
+      let lx = logicalPos.x, ly = logicalPos.y;
+      let stepsX=2**n,stepsY=3**m,
           gridX=Math.floor(lx*stepsX)/stepsX,gridY=Math.floor(ly*stepsY)/stepsY;
       gridX<0&&(gridX=0);gridY<0&&(gridY=0);
       gridX+currentShape.w>1&&(gridX=1-currentShape.w);
@@ -362,6 +472,31 @@ document.addEventListener('mousemove',e=>{
     }
   }
   
+  // 处理平移操作
+  if(isPanning){
+    e.preventDefault();
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    
+    // 计算平移量（逻辑坐标）
+    // 鼠标移动的像素距离转换为逻辑坐标距离
+    // x轴：鼠标向右移动，视口向左移动（显示右侧的内容）
+    // y轴：鼠标向上移动，视口向下移动（显示上方的内容）
+    const logicalDx = -dx / (500 * viewport.scale);
+    const logicalDy = dy / (500 * viewport.scale);
+    
+    // 更新视口位置
+    viewport.x = viewportStart.x + logicalDx;
+    viewport.y = viewportStart.y + logicalDy;
+    
+    // 检查边界
+    clampViewport();
+    
+    // 重绘
+    drawAll();
+    return;
+  }
+  
   if(!isDragging||selectedId===null)return;
   
   e.preventDefault();
@@ -370,8 +505,12 @@ document.addEventListener('mousemove',e=>{
       rr=rectangles.find(r=>r.id===selectedId);
   if(!rr)return;
   
-  let targetX=x/500-dragOffset.x,targetY=1-y/500-dragOffset.y,
-      stepsX=2**rr.n,stepsY=3**rr.m,
+  // 将画布像素坐标转换为逻辑坐标
+  let logicalPos = canvasToLogical(x, y);
+  let targetX = logicalPos.x - dragOffset.x;
+  let targetY = logicalPos.y - dragOffset.y;
+  
+  let stepsX=2**rr.n,stepsY=3**rr.m,
       alignedX=Math.round(targetX*stepsX)/stepsX,alignedY=Math.round(targetY*stepsY)/stepsY,
       w=1/2**rr.n,h=1/3**rr.m;
   
@@ -406,6 +545,7 @@ document.addEventListener('mouseup',()=>{
   
   // 重置状态
   isDragging = false;
+  isPanning = false;
   downPos = null;
   hasMoved = false;
   hadSelectionBeforeClick = false;
@@ -414,8 +554,44 @@ document.addEventListener('mouseup',()=>{
 });
 
 canvas.addEventListener('wheel',e=>{
-  // wheel-based cycling disabled: use clicks to cycle through overlapped items
-  return;
+  e.preventDefault();
+  // 滚轮缩放
+  const zoomSpeed = 0.1;
+  const mouseX = e.clientX - canvas.getBoundingClientRect().left;
+  const mouseY = e.clientY - canvas.getBoundingClientRect().top;
+  
+  // 获取鼠标位置对应的逻辑坐标
+  const logicalBefore = canvasToLogical(mouseX, mouseY);
+  
+  // 计算缩放因子
+  let zoomFactor = 1.0;
+  if (e.deltaY < 0) {
+    // 向上滚动，放大
+    zoomFactor = 1 + zoomSpeed;
+  } else {
+    // 向下滚动，缩小
+    zoomFactor = 1 - zoomSpeed;
+  }
+  
+  // 应用缩放
+  viewport.scale *= zoomFactor;
+  
+  // 限制缩放范围
+  if (viewport.scale < MIN_SCALE) viewport.scale = MIN_SCALE;
+  if (viewport.scale > MAX_SCALE) viewport.scale = MAX_SCALE;
+  
+  // 获取缩放后鼠标位置对应的逻辑坐标
+  const logicalAfter = canvasToLogical(mouseX, mouseY);
+  
+  // 调整视口位置，使鼠标位置对应的逻辑坐标保持不变
+  viewport.x += logicalBefore.x - logicalAfter.x;
+  viewport.y += logicalBefore.y - logicalAfter.y;
+  
+  // 检查边界
+  clampViewport();
+  
+  // 重绘
+  drawAll();
 });
 
 

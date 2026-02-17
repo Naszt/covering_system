@@ -138,9 +138,13 @@ textarea#rect-textarea{width:100%;box-sizing:border-box;height:140px;padding:6px
     <div style="margin:8px 0">
       <textarea id="rect-textarea" placeholder="在此编辑保存字符串，实时解析/更新"></textarea>
     </div>
-    <div class=acts>
-      <button class=act id=clear>Clear</button>
-      <button class=act id=del>[D]elete</button>
+    <div class=acts style="flex-direction: column; gap: 4px;">
+      <div style="display: flex; gap: 4px; justify-content: center;">
+        <button class=act id=clear>Clear</button>
+        <button class=act id=del>[D]elete</button>
+      </div>
+      <div style="display: flex; justify-content: center;">
+      <button class=act id=usage>使用说明</button>
     </div>
   </div>
 </div>
@@ -788,6 +792,9 @@ window.addEventListener('keydown',e=>{
 
 document.getElementById('clear').addEventListener('click',clearAll);
 document.getElementById('del').addEventListener('click',deleteSelected);
+document.getElementById('usage').addEventListener('click',()=>{
+  window.open('https://github.com/Naszt/covering_system/blob/main/USAGE_GUIDE.md', '_blank');
+});
 
 document.addEventListener('mousedown',e=>{
   if(e.target===canvas||canvas.contains(e.target))return;

@@ -21,15 +21,112 @@
 .acts{display:flex;gap:4px;margin-top:8px;justify-content:center}
 .act{background:#4a90e2;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-weight:500;cursor:pointer}
 .act:active{transform:translateY(1px)}
-/* coverage badge and textarea */
+
 .coverage{background:transparent;color:#333;padding:0;margin:0;font-weight:600;font-size:1rem;line-height:1.2}
 textarea#rect-textarea{width:100%;box-sizing:border-box;height:140px;padding:6px;border-radius:6px;border:1px solid #ddd;font-family:Consolas,monospace;font-size:0.85rem;resize:vertical}
+
+
+.scrollbar-container {
+  position: relative;
+  width: 520px;
+  height: 520px;
+}
+.scrollbar-horizontal {
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  width: 500px;
+  height: 5px;
+  z-index: 10;
+}
+.scrollbar-vertical {
+  position: absolute;
+  top: 10px;
+  left: 510px;
+  width: 5px;
+  height: 500px;
+  z-index: 10;
+}
+.scrollbar-track-horizontal,
+.scrollbar-track-vertical {
+  background-color: #f0f0f0;
+  border-radius: 2px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.scrollbar-thumb-horizontal,
+.scrollbar-thumb-vertical {
+  background-color: #a0a0a0;
+  border-radius: 2px;
+  position: absolute;
+  cursor: pointer;
+}
+.scrollbar-thumb-horizontal:hover,
+.scrollbar-thumb-vertical:hover {
+  background-color: #808080;
+}
+.scrollbar-thumb-horizontal {
+  height: 100%;
+  min-width: 20px;
+}
+.scrollbar-thumb-vertical {
+  width: 100%;
+  min-height: 20px;
+}
+.axis-labels {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  font-family: monospace;
+  font-size: 11px;
+  color: #333;
+}
+.axis-labels.y-axis {
+  left: -37px;
+  top: 10px;
+  width: 45px;
+  height: 500px;
+  text-align: right;
+  padding-right: 4px;
+  position: relative;
+}
+.axis-labels.y-axis .axis-label {
+  right: 0px;
+}
+.axis-labels.x-axis {
+  bottom: -1px;
+  left: 16px;
+  width: 500px;
+  height: 10px;
+  text-align: center;
+}
+.axis-label {
+  position: absolute;
+  white-space: nowrap;
+}
 </style></head>
 <body>
 <div class=main>
   <div class=canvas-area>
     <div class=info><span id="coverage" class="coverage">覆盖率: 0.00%</span><span class=count>元素个数: <span id=count>0</span></span></div>
-    <div class=holder><canvas id=canvas width=500 height=500></canvas></div>
+    <div class=holder>
+      <div class="scrollbar-container">
+        <canvas id=canvas width=500 height=500></canvas>
+        <div class="scrollbar-horizontal">
+          <div class="scrollbar-track-horizontal">
+            <div class="scrollbar-thumb-horizontal"></div>
+          </div>
+        </div>
+        <div class="scrollbar-vertical">
+          <div class="scrollbar-track-vertical">
+            <div class="scrollbar-thumb-vertical"></div>
+          </div>
+        </div>
+        <div id="y-axis-labels" class="axis-labels y-axis"></div>
+        <div id="x-axis-labels" class="axis-labels x-axis"></div>
+      </div>
+    </div>
   </div>
   <div class=matrix>
     <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
@@ -50,106 +147,173 @@ textarea#rect-textarea{width:100%;box-sizing:border-box;height:140px;padding:6px
 <script>
 (function(){
 const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),countSpan=document.getElementById('count');
+const scrollbarHorizontal=document.querySelector('.scrollbar-thumb-horizontal');
+const scrollbarVertical=document.querySelector('.scrollbar-thumb-vertical');
+const scrollbarTrackHorizontal=document.querySelector('.scrollbar-track-horizontal');
+const scrollbarTrackVertical=document.querySelector('.scrollbar-track-vertical');
+
 let rectangles=[],nextId=0,selectedId=null,isDragging=!1,dragOffset={x:0,y:0},currentShape={n:0,m:0,w:1,h:1};
-let clickSuppressed = false, downPos = null, hasMoved = false;
-let hadSelectionBeforeClick = false; // 跟踪点击开始时是否已经有选择
-let clickedInSelectedAtDown = false; // 跟踪点击开始时是否在选择的矩形内
-let gridSize = 9; // gridSize x gridSize (0..gridSize-1)
-const GRID_LIMIT_MAX = 60;
+let clickSuppressed=!1,downPos=null,hasMoved=!1;
+let hadSelectionBeforeClick=!1,clickedInSelectedAtDown=!1;
+let gridSize=9;
+const GRID_LIMIT_MAX=60;
 
-// 视口系统：以左下角为原点，支持缩放和平移
-let viewport = {
-  x: 0,      // 视口左下角在逻辑坐标中的x位置
-  y: 0,      // 视口左下角在逻辑坐标中的y位置
-  scale: 1   // 缩放因子，1表示无缩放
-};
-const MIN_SCALE = 1;
-const MAX_SCALE = 10;
-let isPanning = false; // 是否正在平移
-let panStart = { x: 0, y: 0 }; // 平移开始时的鼠标位置
-let viewportStart = { x: 0, y: 0 }; // 平移开始时的视口位置
+let isScrollingHorizontal=!1,isScrollingVertical=!1;
+let scrollStartX=0,scrollStartY=0,thumbStartX=0,thumbStartY=0;
 
-// 将逻辑坐标转换为画布像素坐标
-function logicalToCanvas(logicalX, logicalY) {
-  // 逻辑坐标：左下角为原点，y轴向上
-  // 画布坐标：左上角为原点，y轴向下
-  const canvasX = (logicalX - viewport.x) * viewport.scale * 500;
-  const canvasY = 500 - (logicalY - viewport.y) * viewport.scale * 500;
-  return { x: canvasX, y: canvasY };
+let viewport={x:0,y:0,scale:1};
+const MIN_SCALE=1,MAX_SCALE=10;
+let isPanning=!1,panStart={x:0,y:0},viewportStart={x:0,y:0};
+
+let textareaHistory=[];
+let historyIndex=-1;
+let isUndoRedoInProgress=!1;
+let debounceTimer=null;
+
+function saveToHistory(text){
+  if(isUndoRedoInProgress)return;
+  
+  if(textareaHistory.length > 0 && textareaHistory[historyIndex] === text){
+    return;
+  }
+  
+  if(historyIndex<textareaHistory.length-1){
+    textareaHistory=textareaHistory.slice(0,historyIndex+1);
+  }
+  textareaHistory.push(text);
+  historyIndex=textareaHistory.length-1;
+  if(textareaHistory.length>50){
+    textareaHistory=textareaHistory.slice(-50);
+    historyIndex=textareaHistory.length-1;
+  }
 }
 
-// 将画布像素坐标转换为逻辑坐标
-function canvasToLogical(canvasX, canvasY) {
-  // 画布坐标：左上角为原点，y轴向下
-  // 逻辑坐标：左下角为原点，y轴向上
-  const logicalX = viewport.x + (canvasX / 500) / viewport.scale;
-  const logicalY = viewport.y + (1 - canvasY / 500) / viewport.scale;
-  return { x: logicalX, y: logicalY };
+function performUndo(){
+  if(historyIndex<=0)return;
+  historyIndex--;
+  isUndoRedoInProgress=!0;
+  const ta=document.getElementById('rect-textarea');
+  if(ta){
+    suppressTextarea=!0;
+    ta.value=textareaHistory[historyIndex];
+    suppressTextarea=!1;
+    parseTextareaAndLoad();
+  }
+  isUndoRedoInProgress=!1;
 }
 
-// 检查视口是否超出边界
-function clampViewport() {
-  // 逻辑坐标范围是 [0,1] x [0,1]
-  // 视口显示的范围是 [viewport.x, viewport.x + 1/viewport.scale] x [viewport.y, viewport.y + 1/viewport.scale]
-  const viewWidth = 1 / viewport.scale;
-  const viewHeight = 1 / viewport.scale;
-  
-  // 不能超出左边界
-  if (viewport.x < 0) viewport.x = 0;
-  // 不能超出右边界
-  if (viewport.x + viewWidth > 1) viewport.x = 1 - viewWidth;
-  // 不能超出下边界
-  if (viewport.y < 0) viewport.y = 0;
-  // 不能超出上边界
-  if (viewport.y + viewHeight > 1) viewport.y = 1 - viewHeight;
-  
-  // 如果视口宽度大于1，则居中显示
-  if (viewWidth > 1) {
-    viewport.x = (1 - viewWidth) / 2;
+function performRedo(){
+  if(historyIndex>=textareaHistory.length-1)return;
+  historyIndex++;
+  isUndoRedoInProgress=!0;
+  const ta=document.getElementById('rect-textarea');
+  if(ta){
+    suppressTextarea=!0;
+    ta.value=textareaHistory[historyIndex];
+    suppressTextarea=!1;
+    parseTextareaAndLoad();
   }
-  // 如果视口高度大于1，则居中显示
-  if (viewHeight > 1) {
-    viewport.y = (1 - viewHeight) / 2;
-  }
+  isUndoRedoInProgress=!1;
+}
+
+function logicalToCanvas(logicalX,logicalY){
+  const canvasX=(logicalX-viewport.x)*viewport.scale*500;
+  const canvasY=500-(logicalY-viewport.y)*viewport.scale*500;
+  return{x:canvasX,y:canvasY};
+}
+
+function canvasToLogical(canvasX,canvasY){
+  const logicalX=viewport.x+(canvasX/500)/viewport.scale;
+  const logicalY=viewport.y+(1-canvasY/500)/viewport.scale;
+  return{x:logicalX,y:logicalY};
+}
+
+function clampViewport(){
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  if(viewport.x<0)viewport.x=0;
+  if(viewport.x+viewWidth>1)viewport.x=1-viewWidth;
+  if(viewport.y<0)viewport.y=0;
+  if(viewport.y+viewHeight>1)viewport.y=1-viewHeight;
+  if(viewWidth>1)viewport.x=(1-viewWidth)/2;
+  if(viewHeight>1)viewport.y=(1-viewHeight)/2;
 }
 
 function updateCount(){
-  countSpan.innerText = rectangles.length;
-  try{ updateTextareaFromRects(); }catch(e){}
-  try{ updateCoverage(); }catch(e){}
+  countSpan.innerText=rectangles.length;
+  try{updateTextareaFromRects();}catch(e){}
+  try{updateCoverage();}catch(e){}
 }
 const usedKeys=()=>new Set(rectangles.map(r=>r.n+','+r.m));
 
 function vPow(k,p,max){
-  if(k===0) return max;
-  let v=0; while(k%p===0){k/=p;v++;}
+  if(k===0)return max;
+  let v=0;while(k%p===0){k/=p;v++;}
   return v>max?max:v;
 }
 
 function drawFineGrid(){
-  const H = 3**5, V = 2**8;
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  let hLevel=0;
+  if(viewHeight>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewHeight<=maxLinesInView&&hLevel<12){
+      hLevel++;
+      temp*=3;
+    }
+    if(temp*viewHeight>maxLinesInView&&hLevel>0){
+      hLevel--;
+      temp/=3;
+    }
+  }
+  let vLevel=0;
+  if(viewWidth>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewWidth<=maxLinesInView&&vLevel<16){
+      vLevel++;
+      temp*=2;
+    }
+    if(temp*viewWidth>maxLinesInView&&vLevel>0){
+      vLevel--;
+      temp/=2;
+    }
+  }
+  const H=3**hLevel,V=2**vLevel;
   ctx.save();
-  ctx.lineWidth = 0.5;
-  for(let k=0;k<H;k++){
-    let yFrac = k / H;
-    let cy = (1 - yFrac) * 500;
-    let v = vPow(k,3,5);
-    let alpha = 0.03 + (v/5) * 0.22;
-    ctx.strokeStyle = 'rgba(0,0,0,' + alpha + ')';
+  ctx.lineWidth=0.5;
+  const logicalYStart=viewport.y,logicalYEnd=viewport.y+viewHeight;
+  const kStartY=Math.floor(logicalYStart*H),kEndY=Math.ceil(logicalYEnd*H);
+  for(let k=Math.max(0,kStartY);k<=Math.min(H-1,kEndY);k++){
+    let yFrac=k/H;
+    let logicalY=yFrac;
+    let canvasPos=logicalToCanvas(0,logicalY);
+    let cy=canvasPos.y;
+    if(cy<0||cy>500)continue;
+    let v=vPow(k,3,hLevel);
+    let alpha=0.03+(v/hLevel)*0.22;
+    alpha*=Math.min(1,viewport.scale/2);
+    ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
     ctx.beginPath();
-    ctx.moveTo(0, Math.round(cy)+0.5);
-    ctx.lineTo(500, Math.round(cy)+0.5);
+    ctx.moveTo(0,Math.round(cy)+0.5);
+    ctx.lineTo(500,Math.round(cy)+0.5);
     ctx.stroke();
   }
-  for(let k=0;k<V;k++){
-    let xFrac = k / V;
-    let cx = xFrac * 500;
-    let v = vPow(k,2,8);
-    let alpha = 0.03 + (v/8) * 0.22;
-    ctx.strokeStyle = 'rgba(0,0,0,' + alpha + ')';
+  const logicalXStart=viewport.x,logicalXEnd=viewport.x+viewWidth;
+  const kStartX=Math.floor(logicalXStart*V),kEndX=Math.ceil(logicalXEnd*V);
+  for(let k=Math.max(0,kStartX);k<=Math.min(V-1,kEndX);k++){
+    let xFrac=k/V;
+    let logicalX=xFrac;
+    let canvasPos=logicalToCanvas(logicalX,0);
+    let cx=canvasPos.x;
+    if(cx<0||cx>500)continue;
+    let v=vPow(k,2,vLevel);
+    let alpha=0.03+(v/vLevel)*0.22;
+    alpha*=Math.min(1,viewport.scale/2);
+    ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
     ctx.beginPath();
-    ctx.moveTo(Math.round(cx)+0.5, 0);
-    ctx.lineTo(Math.round(cx)+0.5, 500);
+    ctx.moveTo(Math.round(cx)+0.5,0);
+    ctx.lineTo(Math.round(cx)+0.5,500);
     ctx.stroke();
   }
   ctx.restore();
@@ -163,24 +327,130 @@ function drawAll(){
   otherRects.forEach(r=>drawRect(r,0));
   selectedRect&&drawRect(selectedRect,1);
   ctx.strokeStyle='#1f3b4f';ctx.lineWidth=4;ctx.strokeRect(0,0,500,500);
+  updateAxisLabels();
+  updateScrollbars();
+}
+
+function updateAxisLabels(){
+  const yAxis=document.getElementById('y-axis-labels');
+  const xAxis=document.getElementById('x-axis-labels');
+  if(!yAxis||!xAxis)return;
+  
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  let hLevel=0;
+  if(viewHeight>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewHeight<=maxLinesInView&&hLevel<12){
+      hLevel++;
+      temp*=3;
+    }
+    if(temp*viewHeight>maxLinesInView&&hLevel>0){
+      hLevel--;
+      temp/=3;
+    }
+  }
+  let vLevel=0;
+  if(viewWidth>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewWidth<=maxLinesInView&&vLevel<16){
+      vLevel++;
+      temp*=2;
+    }
+    if(temp*viewWidth>maxLinesInView&&vLevel>0){
+      vLevel--;
+      temp/=2;
+    }
+  }
+  const H=3**hLevel,V=2**vLevel;
+  
+  yAxis.innerHTML='';
+  const logicalYStart=viewport.y,logicalYEnd=viewport.y+viewHeight;
+  const kStartY=Math.floor(logicalYStart*H),kEndY=Math.ceil(logicalYEnd*H);
+  let yCandidates=[];
+  for(let k=Math.max(0,kStartY);k<=Math.min(H-1,kEndY);k++){
+    let yFrac=k/H;
+    let logicalY=yFrac;
+    let canvasPos=logicalToCanvas(0,logicalY);
+    let cy=canvasPos.y;
+    if(cy<10||cy>490)continue;
+    let v=vPow(k,3,hLevel);
+    let label=reverseBaseDigitsStr(k,3,hLevel);
+    yCandidates.push({k,cy,v,label});
+  }
+  yCandidates.sort((a,b)=>{return a.label.length-b.label.length;});
+  for(let len=1,cnt=0,i=0,j=0;len<8;len++){
+    for(;yCandidates[j].label.length===len;j++)if(j>=10){j=i;break;}
+    for(;i<j;i++){
+      let cand=yCandidates[i];
+      let span=document.createElement('span');
+      span.className='axis-label';
+      span.textContent=cand.label;
+      span.style.top=(cand.cy-6)+'px';
+      yAxis.appendChild(span);
+    }
+  }
+  
+  xAxis.innerHTML='';
+  const logicalXStart=viewport.x,logicalXEnd=viewport.x+viewWidth;
+  const kStartX=Math.floor(logicalXStart*V),kEndX=Math.ceil(logicalXEnd*V);
+  let xCandidates=[];
+  for(let k=Math.max(0,kStartX);k<=Math.min(V-1,kEndX);k++){
+    let xFrac=k/V;
+    let logicalX=xFrac;
+    let canvasPos=logicalToCanvas(logicalX,0);
+    let cx=canvasPos.x;
+    if(cx<10||cx>490)continue;
+    let v=vPow(k,2,vLevel);
+    let label=reverseBinaryStr(k,vLevel);
+    xCandidates.push({k,cx,v,label});
+  }
+  xCandidates.sort((a,b)=>{return a.label.length-b.label.length;});
+  for(let len=1,cnt=0,i=0,j=0;len<8;len++){
+    for(;xCandidates[j].label.length===len;j++)if(j>=10){j=i;break;}
+    for(;i<j;i++){
+      let cand=xCandidates[i];
+      let span=document.createElement('span');
+      span.className='axis-label';
+      span.textContent=cand.label;
+      span.style.left=(cand.cx-5)+'px';
+      span.style.transform='translateX(-50%)';
+      xAxis.appendChild(span);
+    }
+  }
+}
+
+
+
+function updateScrollbars(){
+  if(!scrollbarHorizontal||!scrollbarVertical)return;
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  const trackWidth=500,trackHeight=500;
+  const thumbWidth=Math.max(20,viewWidth*trackWidth);
+  const maxThumbX=trackWidth-thumbWidth;
+  const thumbX=viewport.x*trackWidth;
+  const thumbHeight=Math.max(20,viewHeight*trackHeight);
+  const maxThumbY=trackHeight-thumbHeight;
+  const thumbY=trackHeight*(1-viewport.y-viewHeight);
+  scrollbarHorizontal.style.width=thumbWidth+'px';
+  scrollbarHorizontal.style.left=Math.min(maxThumbX,Math.max(0,thumbX))+'px';
+  scrollbarVertical.style.height=thumbHeight+'px';
+  scrollbarVertical.style.top=Math.min(maxThumbY,Math.max(0,thumbY))+'px';
 }
 
 function drawRect(r,isSelected){
   let {n,m,x,y}=r;
-  // 逻辑坐标中的宽度和高度
   let wLogical=1/2**n,hLogical=1/3**m;
-  // 转换为画布坐标
-  let topLeft = logicalToCanvas(x, y + hLogical); // 左上角
-  let bottomRight = logicalToCanvas(x + wLogical, y); // 右下角
-  let canvasW = bottomRight.x - topLeft.x;
-  let canvasH = bottomRight.y - topLeft.y;
-  
+  let topLeft=logicalToCanvas(x,y+hLogical);
+  let bottomRight=logicalToCanvas(x+wLogical,y);
+  let canvasW=bottomRight.x-topLeft.x;
+  let canvasH=bottomRight.y-topLeft.y;
   if(isSelected){
     ctx.fillStyle='rgba(255,240,160,0.5)';ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
     ctx.strokeStyle='rgba(180,120,30,0.8)';ctx.lineWidth=2;
     ctx.save();ctx.globalCompositeOperation='multiply';ctx.strokeRect(topLeft.x+1,topLeft.y+1,canvasW-2,canvasH-2);ctx.restore();
   }else{
-    // 使用不同的混合模式，使叠加更明显
     ctx.fillStyle='rgba(150,150,150,0.6)';ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
     ctx.strokeStyle=`hsla(${(n*37+m*73)%360},80%,60%,0.8)`;
     ctx.lineWidth=2;
@@ -189,9 +459,8 @@ function drawRect(r,isSelected){
 }
 
 function findRectsAt(px,py){
-  // 将画布像素坐标转换为逻辑坐标
-  let logical = canvasToLogical(px, py);
-  let lx = logical.x, ly = logical.y;
+  let logical=canvasToLogical(px,py);
+  let lx=logical.x,ly=logical.y;
   return rectangles.filter(r=>{
     let w=1/2**r.n,h=1/3**r.m;
     return lx>=r.x&&lx<=r.x+w&&ly>=r.y&&ly<=r.y+h;
@@ -206,13 +475,15 @@ function addRectangle(n,m,x,y,autoSelect=1){
   autoSelect&&(selectedId=id);updateCount();updateButtons();drawAll();return 1;
 }
 
-function moveRect(id,nx,ny){
+function moveRect(id,nx,ny,saveHistory=!0){
   let r=rectangles.find(r=>r.id===id);if(!r)return;
   let w=1/2**r.n,h=1/3**r.m;
   if(nx<0||ny<0||nx+w>1||ny+h>1)return;
   r.x=nx;r.y=ny;drawAll();
-  try{ updateTextareaFromRects(); }catch(e){}
-  try{ updateCoverage(); }catch(e){}
+  if(saveHistory){
+    try{updateTextareaFromRects();}catch(e){}
+  }
+  try{updateCoverage();}catch(e){}
 }
 
 function deleteSelected(){
@@ -230,28 +501,26 @@ function updateButtons(){
   let used=usedKeys();
   document.querySelectorAll('.btn').forEach(b=>{
     let n=Number(b.dataset.n),m=Number(b.dataset.m);
-    if(n===0 && m===0){ b.classList.add('dis'); return; }
+    if(n===0&&m===0){b.classList.add('dis');return;}
     used.has(n+','+m)?b.classList.add('dis'):b.classList.remove('dis');
   });
 }
 
-// 取消所有按钮的选中状态
 function deselectAllButtons(){
   document.querySelectorAll('.btn').forEach(b=>{
     b.classList.remove('sel');
   });
-  // 重置currentShape为默认值(0,0)
-  currentShape = {n:0,m:0,w:1,h:1};
+  currentShape={n:0,m:0,w:1,h:1};
 }
 
 function buildMatrix(){
   let t=document.getElementById('rows');t.innerHTML='';
-  const rowsContainer = document.getElementById('rows');
-  const MAX_INDEX = gridSize - 1;
-  rowsContainer.innerHTML = '';
+  const rowsContainer=document.getElementById('rows');
+  const MAX_INDEX=gridSize-1;
+  rowsContainer.innerHTML='';
   for(let m=0;m<=MAX_INDEX;m++){
     let d=document.createElement('div');d.className='row';
-    d.style.gridTemplateColumns = 'repeat(' + gridSize + ',24px)';
+    d.style.gridTemplateColumns='repeat('+gridSize+',24px)';
     for(let n=0;n<=MAX_INDEX;n++){
       let b=document.createElement('button');
       b.className='btn';b.dataset.n=n;b.dataset.m=m;
@@ -260,9 +529,8 @@ function buildMatrix(){
         if(b.classList.contains('dis'))return;
         document.querySelectorAll('.btn').forEach(x=>x.classList.remove('sel'));
         b.classList.add('sel');currentShape={n,m,w:1/2**n,h:1/3**m};
-        // 取消矩形选择
-        selectedId = null;
-        isDragging = false;
+        selectedId=null;
+        isDragging=!1;
         drawAll();
       };
       d.appendChild(b);
@@ -274,184 +542,134 @@ function buildMatrix(){
 }
 
 function updateGridSizeDisplay(){
-  const el = document.getElementById('grid-size');
-  el && (el.innerText = gridSize + '×' + gridSize);
+  const el=document.getElementById('grid-size');
+  el&&(el.innerText=gridSize+'×'+gridSize);
 }
 
-document.getElementById('grid-increase').addEventListener('click', ()=>{
-  if(gridSize >= GRID_LIMIT_MAX) return;
-  gridSize = Math.min(GRID_LIMIT_MAX, gridSize + 1);
-  // 取消矩形选择
-  selectedId = null;
-  isDragging = false;
-  buildMatrix(); updateButtons(); updateGridSizeDisplay(); drawAll();
+document.getElementById('grid-increase').addEventListener('click',()=>{
+  if(gridSize>=GRID_LIMIT_MAX)return;
+  gridSize=Math.min(GRID_LIMIT_MAX,gridSize+1);
+  selectedId=null;
+  isDragging=!1;
+  buildMatrix();updateButtons();updateGridSizeDisplay();drawAll();
 });
-document.getElementById('grid-decrease').addEventListener('click', ()=>{
-  if(gridSize <= 1) return;
-  gridSize = Math.max(1, gridSize - 1);
-  // 取消矩形选择
-  selectedId = null;
-  isDragging = false;
-  buildMatrix(); updateButtons(); updateGridSizeDisplay(); drawAll();
+document.getElementById('grid-decrease').addEventListener('click',()=>{
+  if(gridSize<=1)return;
+  gridSize=Math.max(1,gridSize-1);
+  selectedId=null;
+  isDragging=!1;
+  buildMatrix();updateButtons();updateGridSizeDisplay();drawAll();
 });
 
-// wheel on matrix to expand/contract quickly (hold Shift for safety)
-document.querySelector('.matrix').addEventListener('wheel', e=>{
-  if(!e.shiftKey) return; // require Shift + wheel to change size
+document.querySelector('.matrix').addEventListener('wheel',e=>{
+  if(!e.shiftKey)return;
   e.preventDefault();
-  if(e.deltaY < 0){ // zoom in
-    if(gridSize < GRID_LIMIT_MAX) gridSize++;
+  if(e.deltaY<0){
+    if(gridSize<GRID_LIMIT_MAX)gridSize++;
   }else{
-    if(gridSize > 1) gridSize--;
+    if(gridSize>1)gridSize--;
   }
-  buildMatrix(); updateButtons(); updateGridSizeDisplay();
+  buildMatrix();updateButtons();updateGridSizeDisplay();
 });
 
 canvas.addEventListener('mousedown',e=>{
   let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
       x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;
-  
-  // 检查是否按下了 Ctrl 或 Shift 键
-  const isCtrlOrShift = e.ctrlKey || e.shiftKey;
-  
-  // 重置状态
-  downPos = {x: e.clientX, y: e.clientY};
-  hasMoved = false;
-  clickSuppressed = false;
-  hadSelectionBeforeClick = selectedId !== null; // 记录点击开始时是否已经有选择
-  
-  // 检查点击开始时是否在选择的矩形内
-  clickedInSelectedAtDown = false;
-  if(selectedId !== null){
-    let selectedRect = rectangles.find(r=>r.id===selectedId);
+  const isCtrlOrShift=e.ctrlKey||e.shiftKey;
+  downPos={x:e.clientX,y:e.clientY};
+  hasMoved=!1;
+  clickSuppressed=!1;
+  hadSelectionBeforeClick=selectedId!==null;
+  clickedInSelectedAtDown=!1;
+  if(selectedId!==null){
+    let selectedRect=rectangles.find(r=>r.id===selectedId);
     if(selectedRect){
-      // 将画布像素坐标转换为逻辑坐标
-      let logicalPos = canvasToLogical(x, y);
-      let lx = logicalPos.x, ly = logicalPos.y;
-      let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
-      clickedInSelectedAtDown = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
-                                ly >= selectedRect.y && ly <= selectedRect.y + h);
+      let logicalPos=canvasToLogical(x,y);
+      let lx=logicalPos.x,ly=logicalPos.y;
+      let w=1/2**selectedRect.n,h=1/3**selectedRect.m;
+      clickedInSelectedAtDown=(lx>=selectedRect.x&&lx<=selectedRect.x+w&&ly>=selectedRect.y&&ly<=selectedRect.y+h);
     }
   }
-  
-  // 如果点击的不是按钮且不是canvas，取消所有按钮的选中状态
-  if(!e.target.closest || (!e.target.closest('.btn') && e.target !== canvas && !canvas.contains(e.target))){
+  if(!e.target.closest||(!e.target.closest('.btn')&&e.target!==canvas&&!canvas.contains(e.target))){
     deselectAllButtons();
   }
-  
   if(x<0||x>500||y<0||y>500){
     selectedId=null;
     drawAll();
     return;
   }
-  
-  // 如果按下了 Ctrl 或 Shift 键，开始平移操作
   if(isCtrlOrShift){
-    isPanning = true;
-    panStart.x = e.clientX;
-    panStart.y = e.clientY;
-    viewportStart.x = viewport.x;
-    viewportStart.y = viewport.y;
+    isPanning=!0;
+    panStart.x=e.clientX;
+    panStart.y=e.clientY;
+    viewportStart.x=viewport.x;
+    viewportStart.y=viewport.y;
     e.preventDefault();
     return;
   }
-  
-  // 检查是否有按钮被选中（currentShape有效且不是(0,0)）
-  let hasButtonSelected = currentShape && !(currentShape.n === 0 && currentShape.m === 0);
-  
+  let hasButtonSelected=currentShape&&!(currentShape.n===0&&currentShape.m===0);
   if(hasButtonSelected){
-    // 有按钮被选中，优先执行放置操作（创建新矩形）
-    // 保存currentShape的值，然后取消按钮选中状态
-    let savedShape = {n: currentShape.n, m: currentShape.m, w: currentShape.w, h: currentShape.h};
-    
-    // 取消按钮选中状态
+    let savedShape={n:currentShape.n,m:currentShape.m,w:currentShape.w,h:currentShape.h};
     deselectAllButtons();
-    
     let n=savedShape.n,m=savedShape.m;
-    // 检查是否已经存在相同类型的矩形
     if(rectangles.some(r=>r.n===n&&r.m===m))return;
-    
-    // 将画布像素坐标转换为逻辑坐标
-    let logicalPos = canvasToLogical(x, y);
-    let lx = logicalPos.x, ly = logicalPos.y;
-    
+    let logicalPos=canvasToLogical(x,y);
+    let lx=logicalPos.x,ly=logicalPos.y;
     let stepsX=2**n,stepsY=3**m,
         gridX=Math.floor(lx*stepsX)/stepsX,gridY=Math.floor(ly*stepsY)/stepsY;
     gridX<0&&(gridX=0);gridY<0&&(gridY=0);
     gridX+savedShape.w>1&&(gridX=1-savedShape.w);
     gridY+savedShape.h>1&&(gridY=1-savedShape.h);
     gridX=Math.round(gridX*stepsX)/stepsX;gridY=Math.round(gridY*stepsY)/stepsY;
-    
-    // 添加新矩形
     if(addRectangle(n,m,gridX,gridY,1)){
-      // 新矩形创建成功，准备拖动
-      isDragging = true;
-      let newRect = rectangles.find(r=>r.id===selectedId);
+      isDragging=!0;
+      let newRect=rectangles.find(r=>r.id===selectedId);
       if(newRect){
-        dragOffset.x = lx - newRect.x;
-        dragOffset.y = ly - newRect.y;
+        dragOffset.x=lx-newRect.x;
+        dragOffset.y=ly-newRect.y;
       }
     }
-    
     drawAll();
     e.preventDefault();
   }else{
-    // 没有按钮被选中，执行原有的逻辑
     let overlapped=findRectsAt(x,y);
-    
     if(overlapped.length){
-      // 检查是否点击在已选择的矩形内
-      let clickedInSelected = false;
-      if(selectedId !== null){
-        let selectedRect = rectangles.find(r=>r.id===selectedId);
+      let clickedInSelected=!1;
+      if(selectedId!==null){
+        let selectedRect=rectangles.find(r=>r.id===selectedId);
         if(selectedRect){
-          // 将画布像素坐标转换为逻辑坐标
-          let logicalPos = canvasToLogical(x, y);
-          let lx = logicalPos.x, ly = logicalPos.y;
-          let w=1/2**selectedRect.n, h=1/3**selectedRect.m;
-          clickedInSelected = (lx >= selectedRect.x && lx <= selectedRect.x + w &&
-                              ly >= selectedRect.y && ly <= selectedRect.y + h);
+          let logicalPos=canvasToLogical(x,y);
+          let lx=logicalPos.x,ly=logicalPos.y;
+          let w=1/2**selectedRect.n,h=1/3**selectedRect.m;
+          clickedInSelected=(lx>=selectedRect.x&&lx<=selectedRect.x+w&&ly>=selectedRect.y&&ly<=selectedRect.y+h);
         }
       }
-      
-      if(selectedId === null || !clickedInSelected){
-        // 情况1: 未选择，或点击在选择的区域外 - 选择点击的矩形并开始拖动
-        selectedId = overlapped[0].id;
-        isDragging = true;
-        // 将画布像素坐标转换为逻辑坐标
-        let logicalPos = canvasToLogical(x, y);
-        dragOffset.x = logicalPos.x - overlapped[0].x;
-        dragOffset.y = logicalPos.y - overlapped[0].y;
-      } else {
-        // 情况2: 点击在选择的区域内 - 准备拖动，但不立即切换选择
-        // 是否切换选择将在mouseup中根据是否移动决定
-        isDragging = true;
-        // 将画布像素坐标转换为逻辑坐标
-        let logicalPos = canvasToLogical(x, y);
-        let selectedRect = rectangles.find(r=>r.id===selectedId);
+      if(selectedId===null||!clickedInSelected){
+        selectedId=overlapped[0].id;
+        isDragging=!0;
+        let logicalPos=canvasToLogical(x,y);
+        dragOffset.x=logicalPos.x-overlapped[0].x;
+        dragOffset.y=logicalPos.y-overlapped[0].y;
+      }else{
+        isDragging=!0;
+        let logicalPos=canvasToLogical(x,y);
+        let selectedRect=rectangles.find(r=>r.id===selectedId);
         if(selectedRect){
-          dragOffset.x = logicalPos.x - selectedRect.x;
-          dragOffset.y = logicalPos.y - selectedRect.y;
+          dragOffset.x=logicalPos.x-selectedRect.x;
+          dragOffset.y=logicalPos.y-selectedRect.y;
         }
       }
-      
       drawAll();
       e.preventDefault();
     }else{
-      // 点击空白处：取消选择
       selectedId=null;
       drawAll();
-      
-      // 如果没有矩形被点击，尝试添加新矩形
-      // 只有当currentShape有效且不是(0,0)时才允许添加（(0,0)是被禁用的）
       if(!currentShape)return;
       let n=currentShape.n,m=currentShape.m;
-      // 检查是否是(0,0)元素，如果是则不允许添加
-      if(n === 0 && m === 0) return;
+      if(n===0&&m===0)return;
       if(rectangles.some(r=>r.n===n&&r.m===m))return;
-      // 将画布像素坐标转换为逻辑坐标
-      let logicalPos = canvasToLogical(x, y);
-      let lx = logicalPos.x, ly = logicalPos.y;
+      let logicalPos=canvasToLogical(x,y);
+      let lx=logicalPos.x,ly=logicalPos.y;
       let stepsX=2**n,stepsY=3**m,
           gridX=Math.floor(lx*stepsX)/stepsX,gridY=Math.floor(ly*stepsY)/stepsY;
       gridX<0&&(gridX=0);gridY<0&&(gridY=0);
@@ -465,320 +683,382 @@ canvas.addEventListener('mousedown',e=>{
 
 document.addEventListener('mousemove',e=>{
   if(downPos){
-    const dx = Math.abs(e.clientX - downPos.x), dy = Math.abs(e.clientY - downPos.y);
-    if(dx > 4 || dy > 4) {
-      clickSuppressed = true;
-      hasMoved = true; // 标记已移动
+    const dx=Math.abs(e.clientX-downPos.x),dy=Math.abs(e.clientY-downPos.y);
+    if(dx>4||dy>4){
+      clickSuppressed=!0;
+      hasMoved=!0;
     }
   }
-  
-  // 处理平移操作
   if(isPanning){
     e.preventDefault();
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
-    
-    // 计算平移量（逻辑坐标）
-    // 鼠标移动的像素距离转换为逻辑坐标距离
-    // x轴：鼠标向右移动，视口向左移动（显示右侧的内容）
-    // y轴：鼠标向上移动，视口向下移动（显示上方的内容）
-    const logicalDx = -dx / (500 * viewport.scale);
-    const logicalDy = dy / (500 * viewport.scale);
-    
-    // 更新视口位置
-    viewport.x = viewportStart.x + logicalDx;
-    viewport.y = viewportStart.y + logicalDy;
-    
-    // 检查边界
+    const dx=e.clientX-panStart.x;
+    const dy=e.clientY-panStart.y;
+    const logicalDx=-dx/(500*viewport.scale);
+    const logicalDy=dy/(500*viewport.scale);
+    viewport.x=viewportStart.x+logicalDx;
+    viewport.y=viewportStart.y+logicalDy;
     clampViewport();
-    
-    // 重绘
     drawAll();
     return;
   }
-  
   if(!isDragging||selectedId===null)return;
-  
   e.preventDefault();
   let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
       x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s,
       rr=rectangles.find(r=>r.id===selectedId);
   if(!rr)return;
-  
-  // 将画布像素坐标转换为逻辑坐标
-  let logicalPos = canvasToLogical(x, y);
-  let targetX = logicalPos.x - dragOffset.x;
-  let targetY = logicalPos.y - dragOffset.y;
-  
+  let logicalPos=canvasToLogical(x,y);
+  let targetX=logicalPos.x-dragOffset.x;
+  let targetY=logicalPos.y-dragOffset.y;
   let stepsX=2**rr.n,stepsY=3**rr.m,
       alignedX=Math.round(targetX*stepsX)/stepsX,alignedY=Math.round(targetY*stepsY)/stepsY,
       w=1/2**rr.n,h=1/3**rr.m;
-  
   alignedX<0&&(alignedX=0);alignedY<0&&(alignedY=0);
   alignedX+w>1&&(alignedX=1-w);alignedY+h>1&&(alignedY=1-h);
   alignedX=Math.round(alignedX*stepsX)/stepsX;alignedY=Math.round(alignedY*stepsY)/stepsY;
-  
-  moveRect(rr.id,alignedX,alignedY);
+  moveRect(rr.id,alignedX,alignedY,!1); // 拖动过程中不保存历史
 });
 
 document.addEventListener('mouseup',()=>{
-  // 如果点击在已选择的矩形内且没有移动，切换到下一个矩形
-  // 只有当点击开始时已经有选择且点击在选择的矩形内时才执行切换逻辑
-  if(!hasMoved && downPos && selectedId !== null && hadSelectionBeforeClick && clickedInSelectedAtDown){
-    // 获取点击位置
+  if(!hasMoved&&downPos&&selectedId!==null&&hadSelectionBeforeClick&&clickedInSelectedAtDown){
     let r=canvas.getBoundingClientRect(),s=canvas.width/r.width,
         x=(downPos.x-r.left)*s,y=(downPos.y-r.top)*s;
-    
-    if(x>=0 && x<=500 && y>=0 && y<=500){
+    if(x>=0&&x<=500&&y>=0&&y<=500){
       let overlapped=findRectsAt(x,y);
-      
-      // 如果点击在已选择的矩形内且有多个矩形重叠，切换到下一个
-      if(overlapped.length > 1){
-        let idx = overlapped.findIndex(rr=>rr.id===selectedId);
-        if(idx !== -1){
-          // 切换到下一个矩形（循环）
-          selectedId = overlapped[(idx + 1) % overlapped.length].id;
+      if(overlapped.length>1){
+        let idx=overlapped.findIndex(rr=>rr.id===selectedId);
+        if(idx!==-1){
+          selectedId=overlapped[(idx+1)%overlapped.length].id;
         }
       }
     }
   }
-  
-  // 重置状态
-  isDragging = false;
-  isPanning = false;
-  downPos = null;
-  hasMoved = false;
-  hadSelectionBeforeClick = false;
-  clickedInSelectedAtDown = false;
+  isDragging=!1;
+  isPanning=!1;
+  downPos=null;
+  hasMoved=!1;
+  hadSelectionBeforeClick=!1;
+  clickedInSelectedAtDown=!1;
   drawAll();
+  
+  // 拖动结束后保存历史记录
+  if(selectedId!==null){
+    try{updateTextareaFromRects();}catch(e){}
+  }
 });
 
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
-  // 滚轮缩放
-  const zoomSpeed = 0.1;
-  const mouseX = e.clientX - canvas.getBoundingClientRect().left;
-  const mouseY = e.clientY - canvas.getBoundingClientRect().top;
-  
-  // 获取鼠标位置对应的逻辑坐标
-  const logicalBefore = canvasToLogical(mouseX, mouseY);
-  
-  // 计算缩放因子
-  let zoomFactor = 1.0;
-  if (e.deltaY < 0) {
-    // 向上滚动，放大
-    zoomFactor = 1 + zoomSpeed;
-  } else {
-    // 向下滚动，缩小
-    zoomFactor = 1 - zoomSpeed;
+  const zoomSpeed=0.1;
+  const mouseX=e.clientX-canvas.getBoundingClientRect().left;
+  const mouseY=e.clientY-canvas.getBoundingClientRect().top;
+  const logicalBefore=canvasToLogical(mouseX,mouseY);
+  let zoomFactor=1.0;
+  if(e.deltaY<0){
+    zoomFactor=1+zoomSpeed;
+  }else{
+    zoomFactor=1-zoomSpeed;
   }
-  
-  // 应用缩放
-  viewport.scale *= zoomFactor;
-  
-  // 限制缩放范围
-  if (viewport.scale < MIN_SCALE) viewport.scale = MIN_SCALE;
-  if (viewport.scale > MAX_SCALE) viewport.scale = MAX_SCALE;
-  
-  // 获取缩放后鼠标位置对应的逻辑坐标
-  const logicalAfter = canvasToLogical(mouseX, mouseY);
-  
-  // 调整视口位置，使鼠标位置对应的逻辑坐标保持不变
-  viewport.x += logicalBefore.x - logicalAfter.x;
-  viewport.y += logicalBefore.y - logicalAfter.y;
-  
-  // 检查边界
+  viewport.scale*=zoomFactor;
+  if(viewport.scale<MIN_SCALE)viewport.scale=MIN_SCALE;
+  if(viewport.scale>MAX_SCALE)viewport.scale=MAX_SCALE;
+  const logicalAfter=canvasToLogical(mouseX,mouseY);
+  viewport.x+=logicalBefore.x-logicalAfter.x;
+  viewport.y+=logicalBefore.y-logicalAfter.y;
   clampViewport();
-  
-  // 重绘
   drawAll();
 });
-
 
 canvas.addEventListener('dragstart',e=>e.preventDefault());
 
 window.addEventListener('keydown',e=>{
-  const k = e.key.toLowerCase();
-  if(k==='d'&&selectedId!==null){ deleteSelected(); e.preventDefault(); }
-  // Save/Load shortcuts removed; use右侧文本框实时同步
+  const k=e.key.toLowerCase();
+  if(k==='d'&&selectedId!==null){deleteSelected();e.preventDefault();}
+  // if(k==='c'){clearAll();e.preventDefault();}
+  if(e.ctrlKey){
+    if(k==='z'){
+      performUndo();
+      e.preventDefault();
+    }else if(k==='y'){
+      performRedo();
+      e.preventDefault();
+    }
+  }
 });
 
 document.getElementById('clear').addEventListener('click',clearAll);
 document.getElementById('del').addEventListener('click',deleteSelected);
 
-// 点击canvas以外位置时取消按钮选中状态和矩形选择
 document.addEventListener('mousedown',e=>{
-  // 如果点击的是canvas或canvas内的元素，不处理（由canvas的mousedown事件处理）
-  if(e.target === canvas || canvas.contains(e.target)) return;
-  
-  // 如果点击的是按钮或相关控件，不取消选择
-  if(e.target.closest && (e.target.closest('.btn') || e.target.closest('.act') || e.target.closest('.acts') || e.target.closest('#rows') || e.target.closest('.matrix-controls'))) return;
-  
-  // 取消按钮选中状态
+  if(e.target===canvas||canvas.contains(e.target))return;
+  if(e.target.closest&&(e.target.closest('.btn')||e.target.closest('.act')||e.target.closest('.acts')||e.target.closest('#rows')||e.target.closest('.matrix-controls')))return;
   deselectAllButtons();
-  
-  // 取消矩形选择
-  selectedId = null;
-  isDragging = false;
+  selectedId=null;
+  isDragging=!1;
   drawAll();
 });
 
+function reverseBinaryStr(num,n){
+  if(n===0)return'0';
+  let str=num.toString(2).padStart(n,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'')||'0';
+}
+
+function reverseBaseDigitsStr(num,base,len){
+  if(len===0)return'0';
+  let str=num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'')||'0';
+}
+
 function reverseBinary(num,n){
-  if(n===0) return 0;
-  let s = num.toString(2).padStart(n,'0').split('').reverse().join('');
+  if(n===0)return 0;
+  let s=num.toString(2).padStart(n,'0').split('').reverse().join('');
   return parseInt(s,2);
 }
 
-function reverseBaseDigits(num, base, len){
-  if(len===0) return 0;
-  let s = num.toString(base).padStart(len,'0').split('').reverse().join('');
-  return parseInt(s, base);
+function reverseBaseDigits(num,base,len){
+  if(len===0)return 0;
+  let s=num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return parseInt(s,base);
 }
 
 function egcd(a,b){
-  if(b===0) return [1,0,a];
-  let [x,y,g]=egcd(b,a%b);
-  return [y, x - Math.floor(a/b)*y, g];
+  if(b===0)return[1,0,a];
+  let[x,y,g]=egcd(b,a%b);
+  return[y,x-Math.floor(a/b)*y,g];
 }
 
 function modInv(a,m){
-  let [x,y,g]=egcd(a,m);
-  if(g!==1) return null;
-  x%=m; if(x<0) x+=m; return x;
+  let[x,y,g]=egcd(a,m);
+  if(g!==1)return null;
+  x%=m;if(x<0)x+=m;return x;
 }
 
 function crtCombine(xrev,yrev,n,mPow){
-  const mod2 = 2**n, mod3 = 3**mPow, M = mod2*mod3;
-  if(mod2===1 && mod3===1) return 0;
-  if(mod2===1) return yrev%mod3;
-  if(mod3===1) return xrev%mod2;
-  const inv = modInv(mod2, mod3);
-  const k = ((yrev - xrev) % mod3 + mod3) % mod3;
-  const t = (xrev + (((k * inv) % mod3) * mod2)) % M;
+  const mod2=2**n,mod3=3**mPow,M=mod2*mod3;
+  if(mod2===1&&mod3===1)return 0;
+  if(mod2===1)return yrev%mod3;
+  if(mod3===1)return xrev%mod2;
+  const inv=modInv(mod2,mod3);
+  const k=((yrev-xrev)%mod3+mod3)%mod3;
+  const t=(xrev+(((k*inv)%mod3)*mod2))%M;
   return t;
 }
 
 function encodeRectToString(r){
-  const n=r.n, m=r.m;
-  const xi = Math.round(r.x * (2**n));
-  const yi = Math.round(r.y * (3**m));
-  const xrev = reverseBinary(xi,n);
-  const yrev = reverseBaseDigits(yi,3,m);
-  const t = crtCombine(xrev,yrev,n,m);
-  const M = (2**n)*(3**m);
-  return `${t}+${M}Z`;
+  const n=r.n,m=r.m;
+  const xi=Math.round(r.x*(2**n));
+  const yi=Math.round(r.y*(3**m));
+  const xrev=reverseBinary(xi,n);
+  const yrev=reverseBaseDigits(yi,3,m);
+  const t=crtCombine(xrev,yrev,n,m);
+  const M=(2**n)*(3**m);
+  return`${t}+${M}Z`;
 }
 
-// serialize rectangles to the string format used previously
 function serializeRects(){
   return rectangles.map(encodeRectToString).join(',');
 }
 
-// will be toggled while programmatically writing to textarea
-let suppressTextarea = false;
+let suppressTextarea=!1;
 
 function updateTextareaFromRects(){
-  const ta = document.getElementById('rect-textarea');
-  if(!ta) return;
-  suppressTextarea = true;
-  ta.value = serializeRects();
-  suppressTextarea = false;
+  const ta=document.getElementById('rect-textarea');
+  if(!ta)return;
+  suppressTextarea=!0;
+  const newText=serializeRects();
+  ta.value=newText;
+  if(!isUndoRedoInProgress){
+    saveToHistory(newText);
+  }
+  suppressTextarea=!1;
 }
 
 function updateCoverage(){
-  const covEl = document.getElementById('coverage');
-  if(!covEl) return;
-  // compute union area of axis-aligned rectangles on [0,1]^2
+  const covEl=document.getElementById('coverage');
+  if(!covEl)return;
   function computeUnionArea(rects){
-    if(!rects||rects.length===0) return 0;
-    // collect unique x edges
-    const xs = new Set();
-    rects.forEach(r=>{ xs.add(r.x); xs.add(r.x + (1/2**r.n)); });
-    const xsArr = Array.from(xs).sort((a,b)=>a-b);
-    let area = 0;
+    if(!rects||rects.length===0)return 0;
+    const xs=new Set();
+    rects.forEach(r=>{xs.add(r.x);xs.add(r.x+(1/2**r.n));});
+    const xsArr=Array.from(xs).sort((a,b)=>a-b);
+    let area=0;
     for(let i=0;i<xsArr.length-1;i++){
-      const x0 = xsArr[i], x1 = xsArr[i+1];
-      const dx = x1 - x0;
-      if(dx<=0) continue;
-      // gather y-intervals for rectangles that intersect this vertical strip
-      const intervals = [];
+      const x0=xsArr[i],x1=xsArr[i+1];
+      const dx=x1-x0;
+      if(dx<=0)continue;
+      const intervals=[];
       rects.forEach(r=>{
-        const rx0 = r.x, rx1 = r.x + (1/2**r.n);
-        if(rx1 <= x0 || rx0 >= x1) return; // no overlap
-        const y0 = r.y, y1 = r.y + (1/3**r.m);
+        const rx0=r.x,rx1=r.x+(1/2**r.n);
+        if(rx1<=x0||rx0>=x1)return;
+        const y0=r.y,y1=r.y+(1/3**r.m);
         intervals.push([y0,y1]);
       });
-      if(intervals.length===0) continue;
+      if(intervals.length===0)continue;
       intervals.sort((a,b)=>a[0]-b[0]);
-      // merge intervals and sum length
-      let mergedStart = intervals[0][0], mergedEnd = intervals[0][1], coveredY = 0;
+      let mergedStart=intervals[0][0],mergedEnd=intervals[0][1],coveredY=0;
       for(let k=1;k<intervals.length;k++){
-        const s = intervals[k][0], e = intervals[k][1];
-        if(s <= mergedEnd){
-          if(e > mergedEnd) mergedEnd = e;
+        const s=intervals[k][0],e=intervals[k][1];
+        if(s<=mergedEnd){
+          if(e>mergedEnd)mergedEnd=e;
         }else{
-          coveredY += Math.max(0, mergedEnd - mergedStart);
-          mergedStart = s; mergedEnd = e;
+          coveredY+=Math.max(0,mergedEnd-mergedStart);
+          mergedStart=s;mergedEnd=e;
         }
       }
-      coveredY += Math.max(0, mergedEnd - mergedStart);
-      area += dx * coveredY;
+      coveredY+=Math.max(0,mergedEnd-mergedStart);
+      area+=dx*coveredY;
     }
-    if(area > 1) area = 1;
+    if(area>1)area=1;
     return area;
   }
-
-  const area = computeUnionArea(rectangles || []);
-  covEl.innerText = '覆盖率: ' + (area*100).toFixed(2) + '%';
+  const area=computeUnionArea(rectangles||[]);
+  covEl.innerText='覆盖率: '+(area*100).toFixed(2)+'%';
 }
 
 function parseTextareaAndLoad(){
-  const ta = document.getElementById('rect-textarea');
-  if(!ta) return;
-  if(suppressTextarea) return;
-  const raw = ta.value || '';
-  const parts = raw.split(',').map(p=>p.trim()).filter(Boolean);
-  // rebuild rectangles from textarea
-  rectangles = []; nextId = 0; selectedId = null; isDragging = 0;
-  for(const p of parts){
-    const parsed = parseEntryString(p);
-    if(parsed){ addRectangle(parsed.n, parsed.m, parsed.x, parsed.y, 0); }
+  const ta=document.getElementById('rect-textarea');
+  if(!ta)return;
+  if(suppressTextarea)return;
+  const raw=ta.value||'';
+  if(!isUndoRedoInProgress){
+    saveToHistory(raw);
   }
-  updateButtons(); drawAll(); updateCount();
+  const parts=raw.split(',').map(p=>p.trim()).filter(Boolean);
+  rectangles=[];nextId=0;selectedId=null;isDragging=0;
+  for(const p of parts){
+    const parsed=parseEntryString(p);
+    if(parsed){addRectangle(parsed.n,parsed.m,parsed.x,parsed.y,0);}
+  }
+  updateButtons();drawAll();updateCount();
+}
+
+function debouncedParseTextareaAndLoad(){
+  if(debounceTimer){
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer=setTimeout(()=>{
+    parseTextareaAndLoad();
+  },500); // 500ms防抖延迟
 }
 
 function parseEntryString(entry){
-  const m = entry.match(/^(\d+)\+(\d+)Z$/);
-  if(!m) return null;
-  const t = parseInt(m[1],10);
-  const M = parseInt(m[2],10);
-  let tmp = M, n=0, mPow=0;
-  while(tmp%2===0){ n++; tmp/=2; }
-  while(tmp%3===0){ mPow++; tmp/=3; }
-  if(tmp!==1) return null;
-  const mod2 = 2**n, mod3 = 3**mPow;
-  const xrev = mod2===1?0:(t % mod2);
-  const yrev = mod3===1?0:(t % mod3);
-  const xi = reverseBinary(xrev,n);
-  const yi = reverseBaseDigits(yrev,3,mPow);
-  const x = n===0?0:(xi / (2**n));
-  const y = mPow===0?0:(yi / (3**mPow));
-  return {n:n,m:mPow,x:x,y:y};
+  const m=entry.match(/^(\d+)\+(\d+)Z$/);
+  if(!m)return null;
+  const t=parseInt(m[1],10);
+  const M=parseInt(m[2],10);
+  let tmp=M,n=0,mPow=0;
+  while(tmp%2===0){n++;tmp/=2;}
+  while(tmp%3===0){mPow++;tmp/=3;}
+  if(tmp!==1)return null;
+  const mod2=2**n,mod3=3**mPow;
+  const xrev=mod2===1?0:(t%mod2);
+  const yrev=mod3===1?0:(t%mod3);
+  const xi=reverseBinary(xrev,n);
+  const yi=reverseBaseDigits(yrev,3,mPow);
+  const x=n===0?0:(xi/(2**n));
+  const y=mPow===0?0:(yi/(3**mPow));
+  return{n:n,m:mPow,x:x,y:y};
 }
 
-// loadAll removed: use textarea (实时编辑)
-
-// bind textarea for live sync and load default string
-const _ta = document.getElementById('rect-textarea');
-const DEFAULT_LOAD = '2+4Z,4+8Z,8+16Z,16+32Z,32+64Z,64+128Z,128+256Z,0+192Z,256+384Z,512+768Z,3+6Z,1+12Z,19+24Z,7+48Z,79+96Z,55+72Z,31+144Z,223+288Z,2+9Z,5+18Z,17+36Z,8+27Z,17+54Z,107+108Z';
+const _ta=document.getElementById('rect-textarea');
+const DEFAULT_LOAD='2+4Z,4+8Z,8+16Z,16+32Z,32+64Z,64+128Z,128+256Z,0+192Z,256+384Z,512+768Z,3+6Z,1+12Z,19+24Z,7+48Z,79+96Z,55+72Z,31+144Z,223+288Z,2+9Z,5+18Z,17+36Z,8+27Z,17+54Z,107+108Z';
 if(_ta){
-  _ta.addEventListener('input', ()=>{ parseTextareaAndLoad(); });
-  // initialize textarea with default string and parse it
-  suppressTextarea = true;
-  _ta.value = DEFAULT_LOAD;
-  suppressTextarea = false;
+  _ta.addEventListener('input',()=>{debouncedParseTextareaAndLoad();});
+  suppressTextarea=!0;
+  _ta.value=DEFAULT_LOAD;
+  suppressTextarea=!1;
+  // 不通过 parseTextareaAndLoad() 保存历史，我们会显式保存
+  isUndoRedoInProgress=!0; // 临时设置为true，防止parseTextareaAndLoad保存历史
   parseTextareaAndLoad();
+  isUndoRedoInProgress=!1;
+  saveToHistory(DEFAULT_LOAD);
 }
+
+if(scrollbarHorizontal&&scrollbarTrackHorizontal){
+  scrollbarHorizontal.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    isScrollingHorizontal=!0;
+    scrollStartX=e.clientX;
+    thumbStartX=parseFloat(scrollbarHorizontal.style.left)||0;
+  });
+  scrollbarTrackHorizontal.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const trackRect=scrollbarTrackHorizontal.getBoundingClientRect();
+    const clickX=e.clientX-trackRect.left;
+    const thumbWidth=parseFloat(scrollbarHorizontal.style.width)||20;
+    const trackWidth=trackRect.width;
+    let targetLeft=clickX-thumbWidth/2;
+    targetLeft=Math.max(0,Math.min(trackWidth-thumbWidth,targetLeft));
+    const viewWidth=1/viewport.scale;
+    const trackWidthLogical=500;
+    viewport.x=targetLeft/trackWidthLogical;
+    clampViewport();
+    drawAll();
+  });
+}
+
+if(scrollbarVertical&&scrollbarTrackVertical){
+  scrollbarVertical.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    isScrollingVertical=!0;
+    scrollStartY=e.clientY;
+    thumbStartY=parseFloat(scrollbarVertical.style.top)||0;
+  });
+  scrollbarTrackVertical.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const trackRect=scrollbarTrackVertical.getBoundingClientRect();
+    const clickY=e.clientY-trackRect.top;
+    const thumbHeight=parseFloat(scrollbarVertical.style.height)||20;
+    const trackHeight=trackRect.height;
+    let targetTop=clickY-thumbHeight/2;
+    targetTop=Math.max(0,Math.min(trackHeight-thumbHeight,targetTop));
+    const viewHeight=1/viewport.scale;
+    const trackHeightLogical=500;
+    viewport.y=1-(targetTop/trackHeightLogical)-viewHeight;
+    clampViewport();
+    drawAll();
+  });
+}
+
+document.addEventListener('mousemove',e=>{
+  if(isScrollingHorizontal){
+    e.preventDefault();
+    const dx=e.clientX-scrollStartX;
+    const trackWidth=500;
+    const thumbWidth=parseFloat(scrollbarHorizontal.style.width)||20;
+    const maxThumbX=trackWidth-thumbWidth;
+    let newLeft=thumbStartX+dx;
+    newLeft=Math.max(0,Math.min(maxThumbX,newLeft));
+    const trackWidthLogical=500;
+    viewport.x=newLeft/trackWidthLogical;
+    clampViewport();
+    drawAll();
+  }
+  if(isScrollingVertical){
+    e.preventDefault();
+    const dy=e.clientY-scrollStartY;
+    const trackHeight=500;
+    const thumbHeight=parseFloat(scrollbarVertical.style.height)||20;
+    const maxThumbY=trackHeight-thumbHeight;
+    let newTop=thumbStartY+dy;
+    newTop=Math.max(0,Math.min(maxThumbY,newTop));
+    const viewHeight=1/viewport.scale;
+    const trackHeightLogical=500;
+    viewport.y=1-(newTop/trackHeightLogical)-viewHeight;
+    clampViewport();
+    drawAll();
+  }
+});
+
+document.addEventListener('mouseup',()=>{
+  isScrollingHorizontal=!1;
+  isScrollingVertical=!1;
+});
 
 buildMatrix();updateButtons();drawAll();updateCount();
 })();

@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><style>
+*{box-sizing:border-box;user-select:none}
+body{background:#f5f5f5;min-height:100vh;display:flex;justify-content:center;align-items:center;font-family:Segoe UI,Roboto,sans-serif;margin:0;padding:8px}
+.main{display:flex;gap:12px;background:#ffffff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.canvas-area{background:transparent;border-radius:6px;padding:6px}
+.info{display:flex;justify-content:space-between;margin-bottom:6px;color:#333;padding:0 6px}
+.count{background:transparent;padding:1px 6px;border-radius:10px;color:#333;font-weight:600;font-size:1rem}
+.holder{position:relative;width:520px;height:520px;background:transparent;border-radius:6px}
+#canvas{position:absolute;top:10px;left:10px;width:500px;height:500px;background:#ffffff;border-radius:4px;border:1px solid #ccc;cursor:grab}
+#canvas:active{cursor:grabbing}
+.matrix{background:transparent;border-radius:6px;padding:4px;min-width:200px;max-height:560px;overflow:auto}
+.matrix canvas{display:block;margin:0 auto;background:#fff;border:1px solid #ccc;border-radius:6px;cursor:pointer}
+.acts{display:flex;gap:4px;margin-top:8px;justify-content:center}
+.act{background:#4a90e2;border:0;color:#fff;padding:4px 8px;border-radius:6px;font-weight:500;cursor:pointer}
+.act:active{transform:translateY(1px)}
+.coverage{background:transparent;color:#333;padding:0;margin:0;font-weight:600;font-size:1rem}
+textarea#rect-textarea{width:100%;box-sizing:border-box;height:120px;padding:6px;border-radius:6px;border:1px solid #ddd;font-family:Consolas,monospace;font-size:0.8rem;resize:vertical}
+.param-panel{display:flex;gap:8px;justify-content:center;margin-bottom:8px;align-items:center;background:#f0f2f5;padding:6px;border-radius:8px}
+.param-panel label{font-weight:600;font-size:0.8rem}
+.param-panel input{width:55px;text-align:center;border:1px solid #ccc;border-radius:4px;padding:2px}
+.scrollbar-container{position:relative;width:520px;height:520px}
+.scrollbar-horizontal{position:absolute;top:5px;left:10px;width:500px;height:5px;z-index:10}
+.scrollbar-vertical{position:absolute;top:10px;left:510px;width:5px;height:500px;z-index:10}
+.scrollbar-track-horizontal,.scrollbar-track-vertical{background-color:#f0f0f0;border-radius:2px;position:relative;width:100%;height:100%}
+.scrollbar-thumb-horizontal,.scrollbar-thumb-vertical{background-color:#a0a0a0;border-radius:2px;position:absolute;cursor:pointer}
+.scrollbar-thumb-horizontal:hover,.scrollbar-thumb-vertical:hover{background-color:#808080}
+.scrollbar-thumb-horizontal{height:100%;min-width:20px}
+.scrollbar-thumb-vertical{width:100%;min-height:20px}
+.axis-labels{position:absolute;z-index:5;pointer-events:none;font-family:monospace;font-size:11px;color:#333}
+.axis-labels.y-axis{left:-37px;top:10px;width:45px;height:500px;text-align:right;padding-right:4px;position:relative}
+.axis-labels.x-axis{bottom:-1px;left:16px;width:500px;height:10px;text-align:center}
+.axis-label{position:absolute;white-space:nowrap}
+</style></head>
+<body>
+<div class=main>
+  <div class=canvas-area>
+    <div class=info><span id="coverage" class="coverage">覆盖率: 0.00%</span><span class=count>元素个数: <span id=count>0</span></span></div>
+    <div class=holder>
+      <div class="scrollbar-container">
+        <canvas id=canvas width=500 height=500></canvas>
+        <div class="scrollbar-horizontal"><div class="scrollbar-track-horizontal"><div class="scrollbar-thumb-horizontal"></div></div></div>
+        <div class="scrollbar-vertical"><div class="scrollbar-track-vertical"><div class="scrollbar-thumb-vertical"></div></div></div>
+        <div id="y-axis-labels" class="axis-labels y-axis"></div>
+        <div id="x-axis-labels" class="axis-labels x-axis"></div>
+      </div>
+    </div>
+  </div>
+  <div class=matrix>
+    <div class="param-panel">
+      <label>a =</label><input type="number" id="paramA" min="2" max="10" value="2" step="1" style="width:55px">
+      <label>b =</label><input type="number" id="paramB" min="2" max="10" value="3" step="1" style="width:55px">
+      <button class=act id="applyParams" style="padding:2px 8px">应用</button>
+    </div>
+    <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
+      <button class=act id=grid-decrease title="缩小网格">-</button>
+      <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id=grid-size>9×9</span></div>
+      <button class=act id=grid-increase title="扩大网格">+</button>
+    </div>
+    <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
+    <div style="margin:8px 0"><textarea id="rect-textarea" placeholder="存储格式: (xrev+a^n)(yrev+b^m)  例如 (1+2^1)(0+3^1)"></textarea></div>
+    <div class=acts style="flex-direction: column; gap: 4px;">
+      <div style="display: flex; gap: 4px; justify-content: center;"><button class=act id=clear>Clear</button><button class=act id=del>[D]elete</button></div>
+      <div style="display: flex; justify-content: center;"><button class=act id=usage>使用说明</button></div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+// ======================= 可配置底数 a, b =======================
+let BASE_A = 2;   // 宽度底数
+let BASE_B = 3;   // 高度底数
+
+// 核心数据结构: 允许多个相同 (n,m) 的矩形
+let rectangles = [];      // 每个元素 {id, n, m, x, y}
+let nextId = 0;
+let selectedId = null;
+let isDragging = false;
+let dragOffset = {x:0, y:0};
+let currentShape = {n:0, m:0, w:1, h:1};  // 当前选中的待添加形状
+
+let clickSuppressed=false, downPos=null, hasMoved=false;
+let hadSelectionBeforeClick=false, clickedInSelectedAtDown=false;
+let gridSize=9;
+const GRID_LIMIT_MAX=60;
+const CELL_SIZE = 24;
+
+let isScrollingHorizontal=false, isScrollingVertical=false;
+let scrollStartX=0, scrollStartY=0, thumbStartX=0, thumbStartY=0;
+let viewport={x:0,y:0,scale:1};
+const MIN_SCALE=1,MAX_SCALE=10;
+let isPanning=false,panStart={x:0,y:0},viewportStart={x:0,y:0};
+
+let textareaHistory=[], historyIndex=-1, isUndoRedoInProgress=false, debounceTimer=null;
+let suppressTextarea=false;
+
+// DOM
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),countSpan=document.getElementById('count');
+const scrollbarHorizontal=document.querySelector('.scrollbar-thumb-horizontal');
+const scrollbarVertical=document.querySelector('.scrollbar-thumb-vertical');
+const scrollbarTrackHorizontal=document.querySelector('.scrollbar-track-horizontal');
+const scrollbarTrackVertical=document.querySelector('.scrollbar-track-vertical');
+const matrixCanvas = document.getElementById('matrixCanvas');
+let matrixCtx = matrixCanvas.getContext('2d');
+
+// ========== 辅助函数 ==========
+function getRectWidth(n) { return 1 / Math.pow(BASE_A, n); }
+function getRectHeight(m) { return 1 / Math.pow(BASE_B, m); }
+
+function getRectBorderColor(n,m) {
+  const hue = (n * 37 + m * 73) % 360;
+  return `hsl(${hue}, 80%, 60%)`;
+}
+
+// 统计某个 (n,m) 出现的次数
+function getRectCount(n,m) {
+  return rectangles.filter(r => r.n === n && r.m === m).length;
+}
+
+// 右侧格子背景色: 次数 0 -> #ffffff, 次数1 -> #e9e9e9, 次数2 -> #cccccc, 次数>=3 -> #999999
+function getCountColor(count) {
+  if(count === 0) return '#ffffff';
+  if(count === 1) return '#e9e9e9';
+  if(count === 2) return '#cccccc';
+  return '#999999';
+}
+
+// 进制反转 (通用)
+function reverseDigits(num, base, len) {
+  if(len === 0) return 0;
+  let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return parseInt(str, base);
+}
+function reverseDigitsStr(num, base, len) {
+  if(len === 0) return '0';
+  let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'') || '0';
+}
+
+// 新存储格式: (xrev+a^n)(yrev+b^m)
+function encodeRectToString(r){
+  const n=r.n, m=r.m;
+  const modA = Math.pow(BASE_A, n);
+  const modB = Math.pow(BASE_B, m);
+  const xi = Math.round(r.x * modA);
+  const yi = Math.round(r.y * modB);
+  const xrev = reverseDigits(xi, BASE_A, n);
+  const yrev = reverseDigits(yi, BASE_B, m);
+  return `(${xrev}+${BASE_A}^${n})(${yrev}+${BASE_B}^${m})`;
+}
+function serializeRects(){ return rectangles.map(encodeRectToString).join(','); }
+
+// 解析新格式，同时兼容旧格式
+function parseEntryString(entry){
+  entry=entry.trim();
+  // 新格式: (数字+底数^指数)(数字+底数^指数)
+  let newMatch = entry.match(/^\((\d+)\+(\d+)\^(\d+)\)\((\d+)\+(\d+)\^(\d+)\)$/);
+  if(newMatch){
+    let xrev = parseInt(newMatch[1],10);
+    let baseA = parseInt(newMatch[2],10);
+    let expA = parseInt(newMatch[3],10);
+    let yrev = parseInt(newMatch[4],10);
+    let baseB = parseInt(newMatch[5],10);
+    let expB = parseInt(newMatch[6],10);
+    if(baseA !== BASE_A || baseB !== BASE_B) return null;
+    const n = expA, m = expB;
+    const modA = Math.pow(BASE_A, n);
+    const modB = Math.pow(BASE_B, m);
+    const xi = reverseDigits(xrev, BASE_A, n);
+    const yi = reverseDigits(yrev, BASE_B, m);
+    const x = n===0 ? 0 : xi / modA;
+    const y = m===0 ? 0 : yi / modB;
+    if(x<0 || x>1 || y<0 || y>1) return null;
+    return {n, m, x, y};
+  }
+  // 兼容旧格式1: (xrev+modAZ)(yrev+modBZ)
+  let oldFormat1 = entry.match(/^\((\d+)\+(\d+)Z\)\((\d+)\+(\d+)Z\)$/);
+  if(oldFormat1){
+    let xrev=parseInt(oldFormat1[1],10), modA=parseInt(oldFormat1[2],10);
+    let yrev=parseInt(oldFormat1[3],10), modB=parseInt(oldFormat1[4],10);
+    let n=0, tmpA=modA;
+    while(tmpA > 1 && tmpA % BASE_A === 0){ tmpA /= BASE_A; n++; }
+    if(tmpA !== 1) return null;
+    let m=0, tmpB=modB;
+    while(tmpB > 1 && tmpB % BASE_B === 0){ tmpB /= BASE_B; m++; }
+    if(tmpB !== 1) return null;
+    if(modA !== Math.pow(BASE_A, n) || modB !== Math.pow(BASE_B, m)) return null;
+    const xi = reverseDigits(xrev, BASE_A, n);
+    const yi = reverseDigits(yrev, BASE_B, m);
+    const x = n===0 ? 0 : xi / modA;
+    const y = m===0 ? 0 : yi / modB;
+    return {n, m, x, y};
+  }
+  // 兼容旧格式2: t+MZ (CRT)
+  let oldCRT = entry.match(/^(\d+)\+(\d+)Z$/);
+  if(oldCRT && BASE_A===2 && BASE_B===3){
+    const t=parseInt(oldCRT[1],10), M=parseInt(oldCRT[2],10);
+    let tmp=M, n=0, m=0;
+    while(tmp % 2 === 0){ n++; tmp/=2; }
+    while(tmp % 3 === 0){ m++; tmp/=3; }
+    if(tmp !== 1) return null;
+    const modA = Math.pow(2, n), modB = Math.pow(3, m);
+    const xrev = modA===1 ? 0 : (t % modA);
+    const yrev = modB===1 ? 0 : (t % modB);
+    const xi = reverseDigits(xrev, 2, n);
+    const yi = reverseDigits(yrev, 3, m);
+    const x = n===0 ? 0 : xi / modA;
+    const y = m===0 ? 0 : yi / modB;
+    return {n, m, x, y};
+  }
+  return null;
+}
+
+// 刷新右侧矩阵面板 (显示次数数字，灰度深度)
+function drawMatrixGrid() {
+  if (!matrixCtx) return;
+  const w = CELL_SIZE, h = CELL_SIZE;
+  matrixCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+  for (let m = 0; m < gridSize; m++) {
+    for (let n = 0; n < gridSize; n++) {
+      const x = n * w, y = m * h;
+      const count = getRectCount(n, m);
+      const isSelected = (currentShape.n === n && currentShape.m === m);
+      
+      // 背景色: 基于次数灰度，选中时覆盖一层淡黄
+      let bgColor = getCountColor(count);
+      matrixCtx.fillStyle = bgColor;
+      matrixCtx.fillRect(x, y, w-0.5, h-0.5);
+      if(isSelected && count===0) {
+        // 未使用时选中高亮
+        matrixCtx.fillStyle = '#ffe5b4';
+        matrixCtx.fillRect(x, y, w-0.5, h-0.5);
+      } else if(isSelected && count>0) {
+        // 已使用时选中叠加半透黄
+        matrixCtx.fillStyle = 'rgba(255,229,180,0.6)';
+        matrixCtx.fillRect(x, y, w-0.5, h-0.5);
+      }
+      
+      // 边框颜色与左侧一致
+      matrixCtx.strokeStyle = getRectBorderColor(n, m);
+      matrixCtx.lineWidth = 1.5;
+      matrixCtx.strokeRect(x+0.5, y+0.5, w-1, h-1);
+      
+      // 显示次数数字
+      if(count > 0) {
+        matrixCtx.font = 'bold 12px "Segoe UI", monospace';
+        matrixCtx.fillStyle = count >= 3 ? '#fff' : '#333';
+        matrixCtx.textAlign = 'center';
+        matrixCtx.textBaseline = 'middle';
+        matrixCtx.fillText(count.toString(), x + w/2, y + h/2);
+      } else if(!isSelected) {
+        // 未选中且0次，可显示一个极淡的占位符（可选，不显示文字保持干净）
+        // 什么都不显示
+      }
+    }
+  }
+}
+function resizeMatrixCanvas() {
+  const width = gridSize * CELL_SIZE, height = gridSize * CELL_SIZE;
+  matrixCanvas.width = width; matrixCanvas.height = height;
+  matrixCanvas.style.width = width + 'px'; matrixCanvas.style.height = height + 'px';
+  drawMatrixGrid();
+}
+function refreshMatrixGrid() { resizeMatrixCanvas(); }
+
+function onMatrixClick(e) {
+  const rect = matrixCanvas.getBoundingClientRect();
+  const scaleX = matrixCanvas.width / rect.width, scaleY = matrixCanvas.height / rect.height;
+  const mouseX = (e.clientX - rect.left) * scaleX, mouseY = (e.clientY - rect.top) * scaleY;
+  if (mouseX < 0 || mouseY < 0) return;
+  const col = Math.floor(mouseX / CELL_SIZE), row = Math.floor(mouseY / CELL_SIZE);
+  if (col >= 0 && col < gridSize && row >= 0 && row < gridSize) {
+    // 允许选中任何形状，不限次数（可以重复放置）
+    currentShape = { n: col, m: row, w: getRectWidth(col), h: getRectHeight(row) };
+    selectedId = null;
+    isDragging = false;
+    drawAll();
+    drawMatrixGrid();
+  }
+}
+
+// 更新覆盖率和计数
+function updateCount(){
+  countSpan.innerText = rectangles.length;
+  updateTextareaFromRects();
+  updateCoverage();
+  refreshMatrixGrid();
+}
+function updateCoverage(){
+  const covEl = document.getElementById('coverage');
+  if(!covEl) return;
+  function computeUnionArea(rects){
+    if(!rects.length) return 0;
+    const xs = new Set();
+    rects.forEach(r=>{ xs.add(r.x); xs.add(r.x + getRectWidth(r.n)); });
+    const xsArr = Array.from(xs).sort((a,b)=>a-b);
+    let area = 0;
+    for(let i=0;i<xsArr.length-1;i++){
+      const x0=xsArr[i], x1=xsArr[i+1], dx=x1-x0;
+      if(dx<=0) continue;
+      const intervals = [];
+      rects.forEach(r=>{
+        const rx0=r.x, rx1=r.x+getRectWidth(r.n);
+        if(rx1<=x0 || rx0>=x1) return;
+        intervals.push([r.y, r.y+getRectHeight(r.m)]);
+      });
+      if(!intervals.length) continue;
+      intervals.sort((a,b)=>a[0]-b[0]);
+      let mergedStart=intervals[0][0], mergedEnd=intervals[0][1], coveredY=0;
+      for(let k=1;k<intervals.length;k++){
+        const s=intervals[k][0], e=intervals[k][1];
+        if(s<=mergedEnd) mergedEnd = Math.max(mergedEnd, e);
+        else { coveredY += Math.max(0, mergedEnd-mergedStart); mergedStart=s; mergedEnd=e; }
+      }
+      coveredY += Math.max(0, mergedEnd-mergedStart);
+      area += dx * coveredY;
+    }
+    return Math.min(area,1);
+  }
+  const area = computeUnionArea(rectangles);
+  covEl.innerText = '覆盖率: ' + (area*100).toFixed(2) + '%';
+}
+
+// ========== 保留原始精细网格和轴标签算法 ==========
+function vPow(k,p,max){
+  if(k===0)return max;
+  let v=0;while(k%p===0){k/=p;v++;}
+  return v>max?max:v;
+}
+function drawFineGrid(){
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  let hLevel=0;
+  if(viewHeight>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewHeight<=maxLinesInView&&hLevel<12){ hLevel++; temp*=3; }
+    if(temp*viewHeight>maxLinesInView&&hLevel>0){ hLevel--; temp/=3; }
+  }
+  let vLevel=0;
+  if(viewWidth>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewWidth<=maxLinesInView&&vLevel<16){ vLevel++; temp*=2; }
+    if(temp*viewWidth>maxLinesInView&&vLevel>0){ vLevel--; temp/=2; }
+  }
+  const H=3**hLevel,V=2**vLevel;
+  ctx.save();
+  ctx.lineWidth=0.5;
+  const logicalYStart=viewport.y,logicalYEnd=viewport.y+viewHeight;
+  const kStartY=Math.floor(logicalYStart*H),kEndY=Math.ceil(logicalYEnd*H);
+  for(let k=Math.max(0,kStartY);k<=Math.min(H-1,kEndY);k++){
+    let yFrac=k/H;
+    let logicalY=yFrac;
+    let canvasPos=logicalToCanvas(0,logicalY);
+    let cy=canvasPos.y;
+    if(cy<0||cy>500)continue;
+    let v=vPow(k,3,hLevel);
+    let alpha=0.03+(v/hLevel)*0.22;
+    alpha*=Math.min(1,viewport.scale/2);
+    ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
+    ctx.beginPath();
+    ctx.moveTo(0,Math.round(cy)+0.5);
+    ctx.lineTo(500,Math.round(cy)+0.5);
+    ctx.stroke();
+  }
+  const logicalXStart=viewport.x,logicalXEnd=viewport.x+viewWidth;
+  const kStartX=Math.floor(logicalXStart*V),kEndX=Math.ceil(logicalXEnd*V);
+  for(let k=Math.max(0,kStartX);k<=Math.min(V-1,kEndX);k++){
+    let xFrac=k/V;
+    let logicalX=xFrac;
+    let canvasPos=logicalToCanvas(logicalX,0);
+    let cx=canvasPos.x;
+    if(cx<0||cx>500)continue;
+    let v=vPow(k,2,vLevel);
+    let alpha=0.03+(v/vLevel)*0.22;
+    alpha*=Math.min(1,viewport.scale/2);
+    ctx.strokeStyle='rgba(0,0,0,'+alpha+')';
+    ctx.beginPath();
+    ctx.moveTo(Math.round(cx)+0.5,0);
+    ctx.lineTo(Math.round(cx)+0.5,500);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function reverseBinaryStr(num,n){
+  if(n===0)return'0';
+  let str=num.toString(2).padStart(n,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'')||'0';
+}
+function reverseBaseDigitsStr(num,base,len){
+  if(len===0)return'0';
+  let str=num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'')||'0';
+}
+function updateAxisLabels(){
+  const yAxis=document.getElementById('y-axis-labels');
+  const xAxis=document.getElementById('x-axis-labels');
+  if(!yAxis||!xAxis)return;
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  let hLevel=0;
+  if(viewHeight>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewHeight<=maxLinesInView&&hLevel<12){ hLevel++; temp*=3; }
+    if(temp*viewHeight>maxLinesInView&&hLevel>0){ hLevel--; temp/=3; }
+  }
+  let vLevel=0;
+  if(viewWidth>0){
+    const maxLinesInView=100;
+    let temp=1;
+    while(temp*viewWidth<=maxLinesInView&&vLevel<16){ vLevel++; temp*=2; }
+    if(temp*viewWidth>maxLinesInView&&vLevel>0){ vLevel--; temp/=2; }
+  }
+  const H=3**hLevel,V=2**vLevel;
+  yAxis.innerHTML='';
+  const logicalYStart=viewport.y,logicalYEnd=viewport.y+viewHeight;
+  const kStartY=Math.floor(logicalYStart*H),kEndY=Math.ceil(logicalYEnd*H);
+  let yCandidates=[];
+  for(let k=Math.max(0,kStartY);k<=Math.min(H-1,kEndY);k++){
+    let yFrac=k/H;
+    let logicalY=yFrac;
+    let canvasPos=logicalToCanvas(0,logicalY);
+    let cy=canvasPos.y;
+    if(cy<10||cy>490)continue;
+    let v=vPow(k,3,hLevel);
+    let label=reverseBaseDigitsStr(k,3,hLevel);
+    yCandidates.push({k,cy,v,label});
+  }
+  yCandidates.sort((a,b)=>a.label.length-b.label.length);
+  for(let len=1,cnt=0,i=0,j=0;len<8;len++){
+    for(;yCandidates[j]?.label.length===len;j++)if(j>=10){j=i;break;}
+    for(;i<j;i++){
+      let cand=yCandidates[i];
+      let span=document.createElement('span');
+      span.className='axis-label';
+      span.textContent=cand.label;
+      span.style.top=(cand.cy-6)+'px';
+      yAxis.appendChild(span);
+    }
+  }
+  xAxis.innerHTML='';
+  const logicalXStart=viewport.x,logicalXEnd=viewport.x+viewWidth;
+  const kStartX=Math.floor(logicalXStart*V),kEndX=Math.ceil(logicalXEnd*V);
+  let xCandidates=[];
+  for(let k=Math.max(0,kStartX);k<=Math.min(V-1,kEndX);k++){
+    let xFrac=k/V;
+    let logicalX=xFrac;
+    let canvasPos=logicalToCanvas(logicalX,0);
+    let cx=canvasPos.x;
+    if(cx<10||cx>490)continue;
+    let v=vPow(k,2,vLevel);
+    let label=reverseBinaryStr(k,vLevel);
+    xCandidates.push({k,cx,v,label});
+  }
+  xCandidates.sort((a,b)=>a.label.length-b.label.length);
+  for(let len=1,cnt=0,i=0,j=0;len<8;len++){
+    for(;xCandidates[j]?.label.length===len;j++)if(j>=10){j=i;break;}
+    for(;i<j;i++){
+      let cand=xCandidates[i];
+      let span=document.createElement('span');
+      span.className='axis-label';
+      span.textContent=cand.label;
+      span.style.left=(cand.cx-5)+'px';
+      span.style.transform='translateX(-50%)';
+      xAxis.appendChild(span);
+    }
+  }
+}
+// 绘图核心
+function logicalToCanvas(logicalX,logicalY){
+  const canvasX=(logicalX-viewport.x)*viewport.scale*500;
+  const canvasY=500-(logicalY-viewport.y)*viewport.scale*500;
+  return{x:canvasX,y:canvasY};
+}
+function canvasToLogical(canvasX,canvasY){
+  const logicalX=viewport.x+(canvasX/500)/viewport.scale;
+  const logicalY=viewport.y+(1-canvasY/500)/viewport.scale;
+  return{x:logicalX,y:logicalY};
+}
+function clampViewport(){
+  const viewWidth=1/viewport.scale,viewHeight=1/viewport.scale;
+  if(viewport.x<0)viewport.x=0;
+  if(viewport.x+viewWidth>1)viewport.x=1-viewWidth;
+  if(viewport.y<0)viewport.y=0;
+  if(viewport.y+viewHeight>1)viewport.y=1-viewHeight;
+  if(viewWidth>1)viewport.x=(1-viewWidth)/2;
+  if(viewHeight>1)viewport.y=(1-viewHeight)/2;
+}
+function drawRect(r, isSelected){
+  const {n,m,x,y}=r;
+  const wLog = getRectWidth(n), hLog = getRectHeight(m);
+  const topLeft = logicalToCanvas(x, y+hLog);
+  const bottomRight = logicalToCanvas(x+wLog, y);
+  const canvasW = bottomRight.x - topLeft.x, canvasH = bottomRight.y - topLeft.y;
+  if(isSelected){
+    ctx.fillStyle='rgba(255,240,160,0.5)'; ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
+    ctx.strokeStyle='rgba(180,120,30,0.8)'; ctx.lineWidth=2;
+    ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.strokeRect(topLeft.x+1,topLeft.y+1,canvasW-2,canvasH-2); ctx.restore();
+  }else{
+    ctx.fillStyle='rgba(150,150,150,0.6)'; ctx.fillRect(topLeft.x,topLeft.y,canvasW,canvasH);
+    ctx.strokeStyle = `hsla(${(n*37+m*73)%360},80%,60%,0.8)`;
+    ctx.lineWidth=2;
+    ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.strokeRect(topLeft.x+1,topLeft.y+1,canvasW-2,canvasH-2); ctx.restore();
+  }
+}
+function drawAll(){
+  ctx.clearRect(0,0,500,500);
+  drawFineGrid();
+  let selectedRect = rectangles.find(r=>r.id===selectedId);
+  let otherRects = rectangles.filter(r=>r.id!==selectedId);
+  otherRects.forEach(r=>drawRect(r,0));
+  if(selectedRect) drawRect(selectedRect,1);
+  ctx.strokeStyle='#1f3b4f'; ctx.lineWidth=4; ctx.strokeRect(0,0,500,500);
+  updateAxisLabels();
+  updateScrollbars();
+}
+function updateScrollbars(){
+  if(!scrollbarHorizontal||!scrollbarVertical) return;
+  const viewWidth=1/viewport.scale, viewHeight=1/viewport.scale;
+  const trackWidth=500, trackHeight=500;
+  const thumbWidth=Math.max(20, viewWidth*trackWidth), maxThumbX=trackWidth-thumbWidth, thumbX=viewport.x*trackWidth;
+  const thumbHeight=Math.max(20, viewHeight*trackHeight), maxThumbY=trackHeight-thumbHeight, thumbY=trackHeight*(1-viewport.y-viewHeight);
+  scrollbarHorizontal.style.width=thumbWidth+'px'; scrollbarHorizontal.style.left=Math.min(maxThumbX,Math.max(0,thumbX))+'px';
+  scrollbarVertical.style.height=thumbHeight+'px'; scrollbarVertical.style.top=Math.min(maxThumbY,Math.max(0,thumbY))+'px';
+}
+function findRectsAt(px,py){
+  let logical=canvasToLogical(px,py);
+  return rectangles.filter(r=>{
+    let w=getRectWidth(r.n), h=getRectHeight(r.m);
+    return logical.x>=r.x && logical.x<=r.x+w && logical.y>=r.y && logical.y<=r.y+h;
+  }).reverse();
+}
+// 允许重复添加相同 (n,m)
+function addRectangle(n,m,x,y,autoSelect=1){
+  let w=getRectWidth(n), h=getRectHeight(m);
+  if(x<0||y<0||x+w>1||y+h>1) return 0;
+  let id=nextId++; rectangles.push({id,n,m,x,y});
+  if(autoSelect) selectedId=id;
+  updateCount(); drawAll();
+  // 不清空 currentShape，允许连续放置相同形状
+  refreshMatrixGrid();
+  return 1;
+}
+function moveRect(id,nx,ny,saveHistory=!0){
+  let r=rectangles.find(r=>r.id===id); if(!r) return;
+  let w=getRectWidth(r.n), h=getRectHeight(r.m);
+  if(nx<0||ny<0||nx+w>1||ny+h>1) return;
+  r.x=nx; r.y=ny; drawAll();
+  if(saveHistory) updateTextareaFromRects();
+  updateCoverage(); refreshMatrixGrid();
+}
+function deleteSelected(){
+  if(selectedId!==null){
+    rectangles=rectangles.filter(r=>r.id!==selectedId);
+    selectedId=null; isDragging=false;
+    updateCount(); drawAll(); refreshMatrixGrid();
+  }
+}
+function clearAll(){
+  rectangles=[]; selectedId=null; isDragging=false;
+  updateCount(); drawAll(); refreshMatrixGrid();
+  currentShape = { n:0, m:0, w:getRectWidth(0), h:getRectHeight(0) };
+  drawMatrixGrid();
+}
+function updateTextareaFromRects(){
+  const ta=document.getElementById('rect-textarea');
+  if(!ta) return;
+  suppressTextarea=true;
+  ta.value=serializeRects();
+  if(!isUndoRedoInProgress) saveToHistory(ta.value);
+  suppressTextarea=false;
+}
+function saveToHistory(text){
+  if(isUndoRedoInProgress) return;
+  if(textareaHistory.length && textareaHistory[historyIndex]===text) return;
+  if(historyIndex<textareaHistory.length-1) textareaHistory=textareaHistory.slice(0,historyIndex+1);
+  textareaHistory.push(text);
+  historyIndex=textareaHistory.length-1;
+  if(textareaHistory.length>50) textareaHistory=textareaHistory.slice(-50), historyIndex=textareaHistory.length-1;
+}
+function performUndo(){ if(historyIndex<=0) return; historyIndex--; isUndoRedoInProgress=true; const ta=document.getElementById('rect-textarea'); if(ta){ suppressTextarea=true; ta.value=textareaHistory[historyIndex]; suppressTextarea=false; parseTextareaAndLoad(); } isUndoRedoInProgress=false; }
+function performRedo(){ if(historyIndex>=textareaHistory.length-1) return; historyIndex++; isUndoRedoInProgress=true; const ta=document.getElementById('rect-textarea'); if(ta){ suppressTextarea=true; ta.value=textareaHistory[historyIndex]; suppressTextarea=false; parseTextareaAndLoad(); } isUndoRedoInProgress=false; }
+function parseTextareaAndLoad(){
+  const ta=document.getElementById('rect-textarea');
+  if(!ta || suppressTextarea) return;
+  const raw=ta.value;
+  if(!isUndoRedoInProgress) saveToHistory(raw);
+  const parts=raw.split(',').map(p=>p.trim()).filter(Boolean);
+  rectangles=[]; nextId=0; selectedId=null; isDragging=false;
+  for(const p of parts){
+    const parsed=parseEntryString(p);
+    if(parsed) addRectangle(parsed.n, parsed.m, parsed.x, parsed.y, 0);
+  }
+  drawAll(); updateCount();
+  if(!getRectCount(currentShape.n, currentShape.m)>=0) {
+    // 形状有效，无需重置
+  }
+  drawMatrixGrid();
+}
+function debouncedParse(){ if(debounceTimer) clearTimeout(debounceTimer); debounceTimer=setTimeout(parseTextareaAndLoad,500); }
+
+function reinitWithNewParams(){
+  rectangles=[]; selectedId=null; isDragging=false;
+  currentShape = { n:0, m:0, w:getRectWidth(0), h:getRectHeight(0) };
+  viewport = {x:0,y:0,scale:1};
+  nextId=0;
+  drawAll();
+  updateCount();
+  refreshMatrixGrid();
+  textareaHistory = []; historyIndex = -1;
+  const ta = document.getElementById('rect-textarea');
+  if(ta){
+    suppressTextarea=true;
+    ta.value = '';
+    suppressTextarea=false;
+    saveToHistory('');
+  }
+}
+function applyNewParams(){
+  let newA = parseInt(document.getElementById('paramA').value,10);
+  let newB = parseInt(document.getElementById('paramB').value,10);
+  if(isNaN(newA) || newA<2) newA=2;
+  if(isNaN(newB) || newB<2) newB=3;
+  if(newA>10) newA=10; if(newB>10) newB=10;
+  if(BASE_A === newA && BASE_B === newB) return;
+  BASE_A = newA; BASE_B = newB;
+  reinitWithNewParams();
+}
+
+// ========== 鼠标/键盘事件 (完整保留) ==========
+canvas.addEventListener('mousedown', e=>{
+  let r=canvas.getBoundingClientRect(), s=canvas.width/r.width, x=(e.clientX-r.left)*s, y=(e.clientY-r.top)*s;
+  const isCtrlOrShift=e.ctrlKey||e.shiftKey;
+  downPos={x:e.clientX,y:e.clientY}; hasMoved=false; clickSuppressed=false;
+  hadSelectionBeforeClick=selectedId!==null; clickedInSelectedAtDown=false;
+  if(selectedId!==null){
+    let sr=rectangles.find(r=>r.id===selectedId);
+    if(sr){
+      let lp=canvasToLogical(x,y), w=getRectWidth(sr.n), h=getRectHeight(sr.m);
+      clickedInSelectedAtDown = (lp.x>=sr.x && lp.x<=sr.x+w && lp.y>=sr.y && lp.y<=sr.y+h);
+    }
+  }
+  if(x<0||x>500||y<0||y>500){ selectedId=null; drawAll(); return; }
+  if(isCtrlOrShift){ isPanning=true; panStart.x=e.clientX; panStart.y=e.clientY; viewportStart.x=viewport.x; viewportStart.y=viewport.y; e.preventDefault(); return; }
+  let hasButtonSelected = currentShape && !(currentShape.n===0 && currentShape.m===0);
+  if(hasButtonSelected){
+    let {n,m,w:hw,h:hh} = currentShape;
+    let lp=canvasToLogical(x,y);
+    let stepsX=Math.pow(BASE_A, n), stepsY=Math.pow(BASE_B, m);
+    let gridX = Math.floor(lp.x * stepsX)/stepsX, gridY = Math.floor(lp.y * stepsY)/stepsY;
+    gridX = Math.max(0, Math.min(1-hw, gridX)); gridY = Math.max(0, Math.min(1-hh, gridY));
+    if(addRectangle(n,m,gridX,gridY,1)){
+      isDragging=true;
+      let newRect=rectangles.find(r=>r.id===selectedId);
+      if(newRect){ dragOffset.x=lp.x-newRect.x; dragOffset.y=lp.y-newRect.y; }
+    }
+    drawAll(); e.preventDefault();
+  }else{
+    let overlapped=findRectsAt(x,y);
+    if(overlapped.length){
+      let clickedInSelected=false;
+      if(selectedId!==null){
+        let sr=rectangles.find(r=>r.id===selectedId);
+        if(sr){
+          let lp=canvasToLogical(x,y), w=getRectWidth(sr.n), h=getRectHeight(sr.m);
+          clickedInSelected = (lp.x>=sr.x && lp.x<=sr.x+w && lp.y>=sr.y && lp.y<=sr.y+h);
+        }
+      }
+      if(selectedId===null || !clickedInSelected){
+        selectedId=overlapped[0].id; isDragging=true;
+        let lp=canvasToLogical(x,y); dragOffset.x=lp.x-overlapped[0].x; dragOffset.y=lp.y-overlapped[0].y;
+      }else{
+        isDragging=true;
+        let lp=canvasToLogical(x,y), sr=rectangles.find(r=>r.id===selectedId);
+        if(sr){ dragOffset.x=lp.x-sr.x; dragOffset.y=lp.y-sr.y; }
+      }
+      drawAll(); e.preventDefault();
+    }else{
+      selectedId=null; drawAll();
+      if(!currentShape) return;
+      let {n,m,w:hw,h:hh}=currentShape;
+      if(n===0 && m===0) return;
+      let lp=canvasToLogical(x,y);
+      let stepsX=Math.pow(BASE_A, n), stepsY=Math.pow(BASE_B, m);
+      let gridX=Math.floor(lp.x*stepsX)/stepsX, gridY=Math.floor(lp.y*stepsY)/stepsY;
+      gridX=Math.max(0, Math.min(1-hw, gridX)); gridY=Math.max(0, Math.min(1-hh, gridY));
+      addRectangle(n,m,gridX,gridY,1);
+    }
+  }
+});
+document.addEventListener('mousemove', e=>{
+  if(downPos){
+    const dx=Math.abs(e.clientX-downPos.x), dy=Math.abs(e.clientY-downPos.y);
+    if(dx>4||dy>4){ clickSuppressed=true; hasMoved=true; }
+  }
+  if(isPanning){
+    e.preventDefault();
+    const dx=e.clientX-panStart.x, dy=e.clientY-panStart.y;
+    const logicalDx=-dx/(500*viewport.scale), logicalDy=dy/(500*viewport.scale);
+    viewport.x=viewportStart.x+logicalDx; viewport.y=viewportStart.y+logicalDy;
+    clampViewport(); drawAll();
+    return;
+  }
+  if(!isDragging || selectedId===null) return;
+  e.preventDefault();
+  let r=canvas.getBoundingClientRect(), s=canvas.width/r.width, x=(e.clientX-r.left)*s, y=(e.clientY-r.top)*s;
+  let rr=rectangles.find(r=>r.id===selectedId);
+  if(!rr) return;
+  let lp=canvasToLogical(x,y);
+  let targetX=lp.x-dragOffset.x, targetY=lp.y-dragOffset.y;
+  let stepsX=Math.pow(BASE_A, rr.n), stepsY=Math.pow(BASE_B, rr.m);
+  let alignedX=Math.round(targetX*stepsX)/stepsX, alignedY=Math.round(targetY*stepsY)/stepsY;
+  let w=getRectWidth(rr.n), h=getRectHeight(rr.m);
+  alignedX=Math.max(0, Math.min(1-w, alignedX)); alignedY=Math.max(0, Math.min(1-h, alignedY));
+  moveRect(rr.id, alignedX, alignedY, false);
+});
+document.addEventListener('mouseup', ()=>{
+  if(!hasMoved && downPos && selectedId!==null && hadSelectionBeforeClick && clickedInSelectedAtDown){
+    let r=canvas.getBoundingClientRect(), s=canvas.width/r.width, x=(downPos.x-r.left)*s, y=(downPos.y-r.top)*s;
+    if(x>=0 && x<=500 && y>=0 && y<=500){
+      let overlapped=findRectsAt(x,y);
+      if(overlapped.length>1){
+        let idx=overlapped.findIndex(rr=>rr.id===selectedId);
+        if(idx!==-1) selectedId=overlapped[(idx+1)%overlapped.length].id;
+      }
+    }
+  }
+  isDragging=false; isPanning=false; downPos=null; hasMoved=false;
+  hadSelectionBeforeClick=false; clickedInSelectedAtDown=false;
+  drawAll();
+  if(selectedId!==null) updateTextareaFromRects();
+});
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const zoomSpeed=0.1;
+  const mouseX=e.clientX-canvas.getBoundingClientRect().left, mouseY=e.clientY-canvas.getBoundingClientRect().top;
+  const logicalBefore=canvasToLogical(mouseX,mouseY);
+  let zoomFactor=e.deltaY<0 ? 1+zoomSpeed : 1-zoomSpeed;
+  viewport.scale*=zoomFactor;
+  if(viewport.scale<MIN_SCALE) viewport.scale=MIN_SCALE;
+  if(viewport.scale>MAX_SCALE) viewport.scale=MAX_SCALE;
+  const logicalAfter=canvasToLogical(mouseX,mouseY);
+  viewport.x+=logicalBefore.x-logicalAfter.x; viewport.y+=logicalBefore.y-logicalAfter.y;
+  clampViewport(); drawAll();
+});
+canvas.addEventListener('dragstart', e=>e.preventDefault());
+window.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(k==='d' && selectedId!==null){ deleteSelected(); e.preventDefault(); }
+  if(e.ctrlKey){ if(k==='z'){ performUndo(); e.preventDefault(); } else if(k==='y'){ performRedo(); e.preventDefault(); } }
+});
+document.getElementById('clear').addEventListener('click',clearAll);
+document.getElementById('del').addEventListener('click',deleteSelected);
+document.getElementById('usage').addEventListener('click',()=>window.open('https://github.com/Naszt/covering_system/blob/main/USAGE_GUIDE.md', '_blank'));
+document.getElementById('grid-increase').addEventListener('click',()=>{ if(gridSize<GRID_LIMIT_MAX){ gridSize++; selectedId=null; isDragging=false; updateGridSizeDisplay(); refreshMatrixGrid(); drawAll(); } });
+document.getElementById('grid-decrease').addEventListener('click',()=>{ if(gridSize>1){ gridSize--; selectedId=null; isDragging=false; updateGridSizeDisplay(); refreshMatrixGrid(); drawAll(); } });
+document.querySelector('.matrix').addEventListener('wheel',e=>{ if(e.shiftKey){ e.preventDefault(); if(e.deltaY<0 && gridSize<GRID_LIMIT_MAX) gridSize++; else if(e.deltaY>0 && gridSize>1) gridSize--; updateGridSizeDisplay(); refreshMatrixGrid(); drawAll(); } });
+function updateGridSizeDisplay(){ document.getElementById('grid-size').innerText=gridSize+'×'+gridSize; }
+
+// 滚动条事件
+if(scrollbarHorizontal&&scrollbarTrackHorizontal){
+  scrollbarHorizontal.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); isScrollingHorizontal=true; scrollStartX=e.clientX; thumbStartX=parseFloat(scrollbarHorizontal.style.left)||0; });
+  scrollbarTrackHorizontal.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); const trackRect=scrollbarTrackHorizontal.getBoundingClientRect(); const clickX=e.clientX-trackRect.left; const thumbWidth=parseFloat(scrollbarHorizontal.style.width)||20; const trackWidth=trackRect.width; let targetLeft=clickX-thumbWidth/2; targetLeft=Math.max(0,Math.min(trackWidth-thumbWidth,targetLeft)); viewport.x=targetLeft/500; clampViewport(); drawAll(); });
+}
+if(scrollbarVertical&&scrollbarTrackVertical){
+  scrollbarVertical.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); isScrollingVertical=true; scrollStartY=e.clientY; thumbStartY=parseFloat(scrollbarVertical.style.top)||0; });
+  scrollbarTrackVertical.addEventListener('mousedown',e=>{ e.preventDefault(); e.stopPropagation(); const trackRect=scrollbarTrackVertical.getBoundingClientRect(); const clickY=e.clientY-trackRect.top; const thumbHeight=parseFloat(scrollbarVertical.style.height)||20; const trackHeight=trackRect.height; let targetTop=clickY-thumbHeight/2; targetTop=Math.max(0,Math.min(trackHeight-thumbHeight,targetTop)); const viewHeight=1/viewport.scale; viewport.y=1-(targetTop/500)-viewHeight; clampViewport(); drawAll(); });
+}
+document.addEventListener('mousemove',e=>{
+  if(isScrollingHorizontal){ e.preventDefault(); const dx=e.clientX-scrollStartX; const thumbWidth=parseFloat(scrollbarHorizontal.style.width)||20; let newLeft=thumbStartX+dx; newLeft=Math.max(0,Math.min(500-thumbWidth,newLeft)); viewport.x=newLeft/500; clampViewport(); drawAll(); }
+  if(isScrollingVertical){ e.preventDefault(); const dy=e.clientY-scrollStartY; const thumbHeight=parseFloat(scrollbarVertical.style.height)||20; let newTop=thumbStartY+dy; newTop=Math.max(0,Math.min(500-thumbHeight,newTop)); const viewHeight=1/viewport.scale; viewport.y=1-(newTop/500)-viewHeight; clampViewport(); drawAll(); }
+});
+document.addEventListener('mouseup',()=>{ isScrollingHorizontal=false; isScrollingVertical=false; });
+
+// 初始化
+function init(){
+  refreshMatrixGrid();
+  matrixCanvas.addEventListener('click', onMatrixClick);
+  document.getElementById('applyParams').addEventListener('click', applyNewParams);
+  const ta = document.getElementById('rect-textarea');
+  const DEFAULT_LOAD = '(1+2^1)(0+3^1),(0+2^1)(1+3^1)';
+  if(ta){
+    ta.addEventListener('input', debouncedParse);
+    suppressTextarea=true;
+    ta.value = DEFAULT_LOAD;
+    suppressTextarea=false;
+    parseTextareaAndLoad();
+    saveToHistory(ta.value);
+  }
+  updateGridSizeDisplay();
+  drawAll();
+}
+init();
+})();
+</script></body>
+</html>

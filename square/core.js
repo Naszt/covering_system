@@ -5,25 +5,25 @@
 
 // ======================= 全局变量和配置 =======================
 // 可配置底数 a, b - 控制矩形的宽度和高度的基数
-let BASE_A = 2;   // 宽度底数
-let BASE_B = 2;   // 高度底数
+let BASE_A = 2;  // 宽度底数
+let BASE_B = 3;  // 高度底数
 
 // 核心数据结构: 允许多个相同 (n,m) 的矩形
-let rectangles = [];      // 每个元素 {id, n, m, x, y}
-let nextId = 0;           // 用于生成唯一ID的计数器
-let selectedId = null;    // 当前选中的矩形ID
-let isDragging = false;   // 是否正在拖拽矩形
+let rectangles = [];   // 每个元素 {id, n, m, x, y}
+let nextId = 0;      // 用于生成唯一ID的计数器
+let selectedId = null;  // 当前选中的矩形ID
+let isDragging = false;  // 是否正在拖拽矩形
 let dragOffset = {x:0, y:0}; // 拖拽时的偏移量
-let currentShape = {n:0, m:0, w:1, h:1};  // 当前选中的待添加形状
+let currentShape = {n:0, m:0, w:1, h:1}; // 当前选中的待添加形状
 
 // 鼠标交互状态变量
 let clickSuppressed=false, downPos=null, hasMoved=false;
 let hadSelectionBeforeClick=false, clickedInSelectedAtDown=false;
 
 // 网格和视图配置
-let gridSize=9;                     // 右侧矩阵网格大小
-const GRID_LIMIT_MAX=60;            // 网格最大限制
-const CELL_SIZE = 24;               // 矩阵网格中每个单元格的大小
+let gridSize=9;           // 右侧矩阵网格大小
+const GRID_LIMIT_MAX=60;      // 网格最大限制
+const CELL_SIZE = 24;        // 矩阵网格中每个单元格的大小
 
 // 滚动条状态
 let isScrollingHorizontal=false, isScrollingVertical=false;
@@ -31,7 +31,7 @@ let scrollStartX=0, scrollStartY=0, thumbStartX=0, thumbStartY=0;
 
 // 视口状态（用于缩放和平移）
 let viewport={x:0,y:0,scale:1};
-const MIN_SCALE=1, MAX_SCALE=10;    // 缩放范围限制
+const MIN_SCALE=1, MAX_SCALE=10;  // 缩放范围限制
 
 // 平移状态
 let isPanning=false, panStart={x:0,y:0}, viewportStart={x:0,y:0};
@@ -57,7 +57,7 @@ let matrixCtx = matrixCanvas.getContext('2d');
  * @returns {number} 矩形宽度
  */
 function getRectWidth(n) { 
-    return 1 / Math.pow(BASE_A, n); 
+  return 1 / Math.pow(BASE_A, n); 
 }
 
 /**
@@ -66,7 +66,7 @@ function getRectWidth(n) {
  * @returns {number} 矩形高度
  */
 function getRectHeight(m) { 
-    return 1 / Math.pow(BASE_B, m); 
+  return 1 / Math.pow(BASE_B, m); 
 }
 
 /**
@@ -76,8 +76,8 @@ function getRectHeight(m) {
  * @returns {string} HSL颜色字符串
  */
 function getRectBorderColor(n,m) {
-    const hue = (n * 37 + m * 73) % 360; // 使用质数乘法避免颜色重复
-    return `hsl(${hue}, 80%, 60%)`;
+  const hue = (n * 37 + m * 73) % 360; // 使用质数乘法避免颜色重复
+  return `hsl(${hue}, 80%, 60%)`;
 }
 
 /**
@@ -87,7 +87,7 @@ function getRectBorderColor(n,m) {
  * @returns {number} 出现次数
  */
 function getRectCount(n,m) {
-    return rectangles.filter(r => r.n === n && r.m === m).length;
+  return rectangles.filter(r => r.n === n && r.m === m).length;
 }
 
 /**
@@ -96,10 +96,10 @@ function getRectCount(n,m) {
  * @returns {string} 颜色值
  */
 function getCountColor(count) {
-    if(count === 0) return '#ffffff';      // 白色 - 未使用
-    if(count === 1) return '#e9e9e9';      // 浅灰 - 使用1次
-    if(count === 2) return '#cccccc';      // 中灰 - 使用2次
-    return '#999999';                      // 深灰 - 使用3次及以上
+  if(count === 0) return '#ffffff';   // 白色 - 未使用
+  if(count === 1) return '#e9e9e9';   // 浅灰 - 使用1次
+  if(count === 2) return '#cccccc';   // 中灰 - 使用2次
+  return '#999999';           // 深灰 - 使用3次及以上
 }
 
 /**
@@ -110,9 +110,9 @@ function getCountColor(count) {
  * @returns {number} 反转后的数字
  */
 function reverseDigits(num, base, len) {
-    if(len === 0) return 0;
-    let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
-    return parseInt(str, base);
+  if(len === 0) return 0;
+  let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return parseInt(str, base);
 }
 
 /**
@@ -123,9 +123,9 @@ function reverseDigits(num, base, len) {
  * @returns {string} 反转后的字符串
  */
 function reverseDigitsStr(num, base, len) {
-    if(len === 0) return '0';
-    let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
-    return str.replace(/^0+/,'') || '0';
+  if(len === 0) return '0';
+  let str = num.toString(base).padStart(len,'0').split('').reverse().join('');
+  return str.replace(/^0+/,'') || '0';
 }
 
 // ======================= 坐标转换函数 =======================
@@ -137,9 +137,9 @@ function reverseDigitsStr(num, base, len) {
  * @returns {Object} 画布坐标 {x, y}
  */
 function logicalToCanvas(logicalX, logicalY){
-    const canvasX = (logicalX - viewport.x) * viewport.scale * 500;
-    const canvasY = 500 - (logicalY - viewport.y) * viewport.scale * 500;
-    return {x: canvasX, y: canvasY};
+  const canvasX = (logicalX - viewport.x) * viewport.scale * 500;
+  const canvasY = 500 - (logicalY - viewport.y) * viewport.scale * 500;
+  return {x: canvasX, y: canvasY};
 }
 
 /**
@@ -149,23 +149,23 @@ function logicalToCanvas(logicalX, logicalY){
  * @returns {Object} 逻辑坐标 {x, y}
  */
 function canvasToLogical(canvasX, canvasY){
-    const logicalX = viewport.x + (canvasX / 500) / viewport.scale;
-    const logicalY = viewport.y + (1 - canvasY / 500) / viewport.scale;
-    return {x: logicalX, y: logicalY};
+  const logicalX = viewport.x + (canvasX / 500) / viewport.scale;
+  const logicalY = viewport.y + (1 - canvasY / 500) / viewport.scale;
+  return {x: logicalX, y: logicalY};
 }
 
 /**
  * 限制视口范围，防止越界
  */
 function clampViewport(){
-    const viewWidth = 1/viewport.scale, viewHeight = 1/viewport.scale;
-    
-    if(viewport.x < 0) viewport.x = 0;
-    if(viewport.x + viewWidth > 1) viewport.x = 1 - viewWidth;
-    if(viewport.y < 0) viewport.y = 0;
-    if(viewport.y + viewHeight > 1) viewport.y = 1 - viewHeight;
-    
-    // 如果视图比整个区域大，则居中显示
-    if(viewWidth > 1) viewport.x = (1 - viewWidth) / 2;
-    if(viewHeight > 1) viewport.y = (1 - viewHeight) / 2;
+  const viewWidth = 1/viewport.scale, viewHeight = 1/viewport.scale;
+  
+  if(viewport.x < 0) viewport.x = 0;
+  if(viewport.x + viewWidth > 1) viewport.x = 1 - viewWidth;
+  if(viewport.y < 0) viewport.y = 0;
+  if(viewport.y + viewHeight > 1) viewport.y = 1 - viewHeight;
+  
+  // 如果视图比整个区域大，则居中显示
+  if(viewWidth > 1) viewport.x = (1 - viewWidth) / 2;
+  if(viewHeight > 1) viewport.y = (1 - viewHeight) / 2;
 }

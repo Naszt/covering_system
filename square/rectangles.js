@@ -10,12 +10,12 @@
  * @returns {Array} 矩形数组（从顶层到底层）
  */
 function findRectsAt(px, py){
-    let logical = canvasToLogical(px, py);
-    return rectangles.filter(r => {
-        let w = getRectWidth(r.n), h = getRectHeight(r.m);
-        return logical.x >= r.x && logical.x <= r.x + w && 
-               logical.y >= r.y && logical.y <= r.y + h;
-    }).reverse(); // 反转数组，使顶层矩形在前
+  let logical = canvasToLogical(px, py);
+  return rectangles.filter(r => {
+    let w = getRectWidth(r.n), h = getRectHeight(r.m);
+    return logical.x >= r.x && logical.x <= r.x + w && 
+        logical.y >= r.y && logical.y <= r.y + h;
+  }).reverse(); // 反转数组，使顶层矩形在前
 }
 
 /**
@@ -28,22 +28,22 @@ function findRectsAt(px, py){
  * @returns {number} 1表示成功，0表示失败
  */
 function addRectangle(n, m, x, y, autoSelect = true){
-    let w = getRectWidth(n), h = getRectHeight(m);
-    
-    // 检查边界
-    if(x < 0 || y < 0 || x + w > 1 || y + h > 1) return 0;
-    
-    let id = nextId++;
-    rectangles.push({id, n, m, x, y});
-    
-    if(autoSelect) selectedId = id;
-    
-    updateCount(); 
-    drawAll();
-    
-    // 不清空 currentShape，允许连续放置相同形状
-    refreshMatrixGrid();
-    return 1;
+  let w = getRectWidth(n), h = getRectHeight(m);
+  
+  // 检查边界
+  if(x < 0 || y < 0 || x + w > 1 || y + h > 1) return 0;
+  
+  let id = nextId++;
+  rectangles.push({id, n, m, x, y});
+  
+  if(autoSelect) selectedId = id;
+  
+  updateCount(); 
+  drawAll();
+  
+  // 不清空 currentShape，允许连续放置相同形状
+  refreshMatrixGrid();
+  return 1;
 }
 
 /**
@@ -54,47 +54,47 @@ function addRectangle(n, m, x, y, autoSelect = true){
  * @param {boolean} saveHistory - 是否保存到历史记录
  */
 function moveRect(id, nx, ny, saveHistory = true){
-    let r = rectangles.find(r => r.id === id); 
-    if(!r) return;
-    
-    let w = getRectWidth(r.n), h = getRectHeight(r.m);
-    if(nx < 0 || ny < 0 || nx + w > 1 || ny + h > 1) return;
-    
-    r.x = nx; 
-    r.y = ny; 
-    drawAll();
-    
-    if(saveHistory) updateTextareaFromRects();
-    updateCoverage(); 
-    refreshMatrixGrid();
+  let r = rectangles.find(r => r.id === id); 
+  if(!r) return;
+  
+  let w = getRectWidth(r.n), h = getRectHeight(r.m);
+  if(nx < 0 || ny < 0 || nx + w > 1 || ny + h > 1) return;
+  
+  r.x = nx; 
+  r.y = ny; 
+  drawAll();
+  
+  if(saveHistory) updateTextareaFromRects();
+  updateCoverage(); 
+  refreshMatrixGrid();
 }
 
 /**
  * 删除选中的矩形
  */
 function deleteSelected(){
-    if(selectedId !== null){
-        rectangles = rectangles.filter(r => r.id !== selectedId);
-        selectedId = null; 
-        isDragging = false;
-        updateCount(); 
-        drawAll(); 
-        refreshMatrixGrid();
-    }
+  if(selectedId !== null){
+    rectangles = rectangles.filter(r => r.id !== selectedId);
+    selectedId = null; 
+    isDragging = false;
+    updateCount(); 
+    drawAll(); 
+    refreshMatrixGrid();
+  }
 }
 
 /**
  * 清除所有矩形
  */
 function clearAll(){
-    rectangles = []; 
-    selectedId = null; 
-    isDragging = false;
-    updateCount(); 
-    drawAll(); 
-    refreshMatrixGrid();
-    
-    // 重置当前形状为默认值
-    currentShape = { n:0, m:0, w:getRectWidth(0), h:getRectHeight(0) };
-    drawMatrixGrid();
+  rectangles = []; 
+  selectedId = null; 
+  isDragging = false;
+  updateCount(); 
+  drawAll(); 
+  refreshMatrixGrid();
+  
+  // 重置当前形状为默认值
+  currentShape = { n:0, m:0, w:getRectWidth(0), h:getRectHeight(0) };
+  drawMatrixGrid();
 }

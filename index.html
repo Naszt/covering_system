@@ -1,122 +1,122 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>覆盖系统可视化工具</title>
-    <!-- 外部CSS文件 -->
-    <link rel="stylesheet" href="square/style.css">
-    <!-- 页面内注释：该应用用于可视化覆盖系统，支持动态调整底数a和b，添加/删除/移动矩形，计算覆盖率 -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>覆盖系统可视化工具</title>
+  <!-- 外部CSS文件 -->
+  <link rel="stylesheet" href="square/style.css">
+  <!-- 页面内注释：该应用用于可视化覆盖系统，支持动态调整底数a和b，添加/删除/移动矩形，计算覆盖率 -->
 </head>
 <body>
-    <div class="main">
-        <!-- 左侧：画布区域 -->
-        <div class="canvas-area">
-            <div class="info">
-                <span id="coverage" class="coverage">覆盖率: 0.00%</span>
-                <span class="count">元素个数: <span id="count">0</span></span>
+  <div class="main">
+    <!-- 左侧：画布区域 -->
+    <div class="canvas-area">
+      <div class="info">
+        <span id="coverage" class="coverage">覆盖率: 0.00%</span>
+        <span class="count">元素个数: <span id="count">0</span></span>
+      </div>
+      <div class="holder">
+        <div class="scrollbar-container">
+          <!-- 主画布：用于显示矩形和网格 -->
+          <canvas id="canvas" width="500" height="500"></canvas>
+          
+          <!-- 水平滚动条 -->
+          <div class="scrollbar-horizontal">
+            <div class="scrollbar-track-horizontal">
+              <div class="scrollbar-thumb-horizontal"></div>
             </div>
-            <div class="holder">
-                <div class="scrollbar-container">
-                    <!-- 主画布：用于显示矩形和网格 -->
-                    <canvas id="canvas" width="500" height="500"></canvas>
-                    
-                    <!-- 水平滚动条 -->
-                    <div class="scrollbar-horizontal">
-                        <div class="scrollbar-track-horizontal">
-                            <div class="scrollbar-thumb-horizontal"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- 垂直滚动条 -->
-                    <div class="scrollbar-vertical">
-                        <div class="scrollbar-track-vertical">
-                            <div class="scrollbar-thumb-vertical"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Y轴标签 -->
-                    <div id="y-axis-labels" class="axis-labels y-axis"></div>
-                    
-                    <!-- X轴标签 -->
-                    <div id="x-axis-labels" class="axis-labels x-axis"></div>
-                </div>
+          </div>
+          
+          <!-- 垂直滚动条 -->
+          <div class="scrollbar-vertical">
+            <div class="scrollbar-track-vertical">
+              <div class="scrollbar-thumb-vertical"></div>
             </div>
+          </div>
+          
+          <!-- Y轴标签 -->
+          <div id="y-axis-labels" class="axis-labels y-axis"></div>
+          
+          <!-- X轴标签 -->
+          <div id="x-axis-labels" class="axis-labels x-axis"></div>
         </div>
-        
-        <!-- 右侧：矩阵面板和控制区域 -->
-        <div class="matrix">
-            <!-- 参数面板：用于设置底数a和b -->
-            <div class="param-panel">
-                <label>a =</label>
-                <input type="number" id="paramA" min="2" max="10" value="2" step="1" style="width:55px">
-                <label>b =</label>
-                <input type="number" id="paramB" min="2" max="10" value="3" step="1" style="width:55px">
-                <button class="act" id="applyParams" style="padding:2px 8px">应用</button>
-            </div>
-            
-            <!-- 矩阵控制：调整网格大小 -->
-            <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
-                <button class="act" id="grid-decrease" title="缩小网格">-</button>
-                <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id="grid-size">9×9</span></div>
-                <button class="act" id="grid-increase" title="扩大网格">+</button>
-            </div>
-            
-            <!-- 矩阵画布：显示矩形类型和计数 -->
-            <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
-            
-            <!-- 文本区域：显示和编辑矩形编码 -->
-            <div style="margin:8px 0">
-                <textarea id="rect-textarea" placeholder="存储格式: (xrev+a^n)(yrev+b^m)  例如 (1+2^1)(0+3^1)"></textarea>
-            </div>
-            
-            <!-- 操作按钮 -->
-            <div class="acts" style="flex-direction: column; gap: 4px;">
-                <div style="display: flex; gap: 4px; justify-content: center;">
-                    <button class="act" id="clear">Clear</button>
-                    <button class="act" id="del">[D]elete</button>
-                </div>
-                <div style="display: flex; justify-content: center;">
-                    <button class="act" id="usage">使用说明</button>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
     
-    <!-- 外部JavaScript文件（按功能模块拆分） -->
-    <!--
-        模块文件功能说明：
-        square/core.js        - 全局变量、DOM引用、辅助函数（坐标转换、颜色计算）
-        square/encoding.js    - 矩形编码/解码、序列化/反序列化
-        square/drawing.js     - 精细网格绘制、坐标轴标签、矩形渲染、主绘制循环
-        square/matrix.js      - 右侧9×9矩阵网格绘制和点击处理
-        square/coverage.js    - 覆盖率计算（扫描线算法）
-        square/rectangles.js  - 矩形的增删改查、移动、删除、清空
-        square/history.js     - 文本区域历史记录、撤销/重做、防抖解析
-        square/params.js      - 参数管理（底数a和b）、重新初始化
-        square/events.js      - 鼠标、键盘、滚动条等事件处理
-        square/init.js        - 应用程序初始化、DOMContentLoaded入口
-    -->
-    <script src="square/core.js"></script>
-    <script src="square/encoding.js"></script>
-    <script src="square/drawing.js"></script>
-    <script src="square/matrix.js"></script>
-    <script src="square/coverage.js"></script>
-    <script src="square/history.js"></script>
-    <script src="square/rectangles.js"></script>
-    <script src="square/params.js"></script>
-    <script src="square/events.js"></script>
-    <script src="square/init.js"></script>
-    
-    <!-- 页面内注释：应用功能包括：
-         1. 支持底数a和b的动态调整（2-10）
-         2. 点击矩阵选择矩形类型
-         3. 在画布上点击添加矩形，拖拽移动矩形
-         4. 支持缩放和平移视图
-         5. 实时计算和显示覆盖率
-         6. 支持矩形编码的文本编辑和解析
-         7. 支持撤销/重做操作
-         8. 支持键盘快捷键（D删除，Ctrl+Z撤销，Ctrl+Y重做）
-    -->
+    <!-- 右侧：矩阵面板和控制区域 -->
+    <div class="matrix">
+      <!-- 参数面板：用于设置底数a和b -->
+      <div class="param-panel">
+        <label>a =</label>
+        <input type="number" id="paramA" min="2" max="10" value="2" step="1" style="width:55px">
+        <label>b =</label>
+        <input type="number" id="paramB" min="2" max="10" value="3" step="1" style="width:55px">
+        <button class="act" id="applyParams" style="padding:2px 8px">应用</button>
+      </div>
+      
+      <!-- 矩阵控制：调整网格大小 -->
+      <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
+        <button class="act" id="grid-decrease" title="缩小网格">-</button>
+        <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id="grid-size">9×9</span></div>
+        <button class="act" id="grid-increase" title="扩大网格">+</button>
+      </div>
+      
+      <!-- 矩阵画布：显示矩形类型和计数 -->
+      <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
+      
+      <!-- 文本区域：显示和编辑矩形编码 -->
+      <div style="margin:8px 0">
+        <textarea id="rect-textarea" placeholder="存储格式: (xrev+a^n)(yrev+b^m) 例如 (1+2^1)(0+3^1)"></textarea>
+      </div>
+      
+      <!-- 操作按钮 -->
+      <div class="acts" style="flex-direction: column; gap: 4px;">
+        <div style="display: flex; gap: 4px; justify-content: center;">
+          <button class="act" id="clear">Clear</button>
+          <button class="act" id="del">[D]elete</button>
+        </div>
+        <div style="display: flex; justify-content: center;">
+          <button class="act" id="usage">使用说明</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 外部JavaScript文件（按功能模块拆分） -->
+  <!--
+    模块文件功能说明：
+    square/core.js    - 全局变量、DOM引用、辅助函数（坐标转换、颜色计算）
+    square/encoding.js  - 矩形编码/解码、序列化/反序列化
+    square/drawing.js   - 精细网格绘制、坐标轴标签、矩形渲染、主绘制循环
+    square/matrix.js   - 右侧9×9矩阵网格绘制和点击处理
+    square/coverage.js  - 覆盖率计算（扫描线算法）
+    square/rectangles.js - 矩形的增删改查、移动、删除、清空
+    square/history.js   - 文本区域历史记录、撤销/重做、防抖解析
+    square/params.js   - 参数管理（底数a和b）、重新初始化
+    square/events.js   - 鼠标、键盘、滚动条等事件处理
+    square/init.js    - 应用程序初始化、DOMContentLoaded入口
+  -->
+  <script src="square/core.js"></script>
+  <script src="square/encoding.js"></script>
+  <script src="square/drawing.js"></script>
+  <script src="square/matrix.js"></script>
+  <script src="square/coverage.js"></script>
+  <script src="square/history.js"></script>
+  <script src="square/rectangles.js"></script>
+  <script src="square/params.js"></script>
+  <script src="square/events.js"></script>
+  <script src="square/init.js"></script>
+  
+  <!-- 页面内注释：应用功能包括：
+     1. 支持底数a和b的动态调整（2-10）
+     2. 点击矩阵选择矩形类型
+     3. 在画布上点击添加矩形，拖拽移动矩形
+     4. 支持缩放和平移视图
+     5. 实时计算和显示覆盖率
+     6. 支持矩形编码的文本编辑和解析
+     7. 支持撤销/重做操作
+     8. 支持键盘快捷键（D删除，Ctrl+Z撤销，Ctrl+Y重做）
+  -->
 </body>
 </html>

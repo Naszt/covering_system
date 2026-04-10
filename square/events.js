@@ -31,10 +31,10 @@ canvas.addEventListener('mousedown', e => {
   }
   
   // 如果点击在画布外，取消选择
-  if(x < 0 || x > 500 || y < 0 || y > 500){ 
-    selectedId = null; 
-    drawAll(); 
-    return; 
+  if(x < 0 || x > 500 || y < 0 || y > 500){
+    selectedId = null;
+    drawAll();
+    return;
   }
   
   // Ctrl/Shift键：进入平移模式
@@ -467,7 +467,22 @@ document.addEventListener('mousemove', e => {
 /**
  * 全局鼠标释放事件（停止滚动条拖拽）
  */
-document.addEventListener('mouseup', () => { 
-  isScrollingHorizontal = false; 
-  isScrollingVertical = false; 
+document.addEventListener('mouseup', () => {
+  isScrollingHorizontal = false;
+  isScrollingVertical = false;
+});
+
+/**
+ * 全局鼠标按下事件（点击画布外取消选择）
+ */
+document.addEventListener('mousedown', e => {
+  // 如果点击目标是删除按钮（ID='del'），不取消选择
+  if (e.target.id === 'del' || e.target.closest('#del')) {
+    return;
+  }
+  // 如果点击目标不是主画布，取消选择
+  if (e.target !== canvas && e.target !== matrixCanvas) {
+    selectedId = null;
+    drawAll();
+  }
 });

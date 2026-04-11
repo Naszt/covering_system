@@ -89,15 +89,15 @@ function parseEntryString(entry){
     const t=parseInt(oldCRT[1],10), M=parseInt(oldCRT[2],10);
     let tmp=M, n=0, m=0;
     
-    while(tmp % 2 === 0){ n++; tmp/=2; }
-    while(tmp % 3 === 0){ m++; tmp/=3; }
+    while(tmp % BASE_A === 0){ n++; tmp/=BASE_A; }
+    while(tmp % BASE_B === 0){ m++; tmp/=BASE_B; }
     if(tmp !== 1) return null;
     
-    const modA = Math.pow(2, n), modB = Math.pow(3, m);
+    const modA = Math.pow(BASE_A, n), modB = Math.pow(BASE_B, m);
     const xrev = modA===1 ? 0 : (t % modA);
     const yrev = modB===1 ? 0 : (t % modB);
-    const xi = reverseDigits(xrev, 2, n);
-    const yi = reverseDigits(yrev, 3, m);
+    const xi = reverseDigits(xrev, BASE_A, n);
+    const yi = reverseDigits(yrev, BASE_B, m);
     const x = n===0 ? 0 : xi / modA;
     const y = m===0 ? 0 : yi / modB;
     

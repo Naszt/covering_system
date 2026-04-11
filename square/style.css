@@ -249,7 +249,7 @@ textarea#rect-textarea {
 
 /* Y轴标签 */
 .axis-labels.y-axis {
-  left: -37px;
+  left: -40px;
   top: 10px;
   width: 45px;
   height: 500px;
@@ -271,6 +271,12 @@ textarea#rect-textarea {
 .axis-label {
   position: absolute;
   white-space: nowrap; /* 防止换行 */
+}
+
+/* Y轴标签右对齐 */
+.axis-labels.y-axis .axis-label {
+  right: 0;
+  text-align: right;
 }
 
 /* 矩阵控制区域的内联样式（在HTML中定义） */

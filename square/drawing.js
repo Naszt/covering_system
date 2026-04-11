@@ -23,37 +23,37 @@ function vPow(k,p,max){
 function drawFineGrid(){
   const viewWidth = 1/viewport.scale, viewHeight = 1/viewport.scale;
   
-  // 计算垂直网格线级别（基数3）
+  // 计算垂直网格线级别（基数BASE_B）
   let hLevel = 0;
   if(viewHeight > 0){
     const maxLinesInView = 100;
     let temp = 1;
-    while(temp * viewHeight <= maxLinesInView && hLevel < 12){ 
-      hLevel++; 
-      temp *= 3; 
+    while(temp * viewHeight <= maxLinesInView && hLevel < 12){
+      hLevel++;
+      temp *= BASE_B;
     }
-    if(temp * viewHeight > maxLinesInView && hLevel > 0){ 
-      hLevel--; 
-      temp /= 3; 
+    if(temp * viewHeight > maxLinesInView && hLevel > 0){
+      hLevel--;
+      temp /= BASE_B;
     }
   }
   
-  // 计算水平网格线级别（基数2）
+  // 计算水平网格线级别（基数BASE_A）
   let vLevel = 0;
   if(viewWidth > 0){
     const maxLinesInView = 100;
     let temp = 1;
-    while(temp * viewWidth <= maxLinesInView && vLevel < 16){ 
-      vLevel++; 
-      temp *= 2; 
+    while(temp * viewWidth <= maxLinesInView && vLevel < 16){
+      vLevel++;
+      temp *= BASE_A;
     }
-    if(temp * viewWidth > maxLinesInView && vLevel > 0){ 
-      vLevel--; 
-      temp /= 2; 
+    if(temp * viewWidth > maxLinesInView && vLevel > 0){
+      vLevel--;
+      temp /= BASE_A;
     }
   }
   
-  const H = 3**hLevel, V = 2**vLevel;
+  const H = BASE_B**hLevel, V = BASE_A**vLevel;
   
   ctx.save();
   ctx.lineWidth = 0.5;
@@ -70,7 +70,7 @@ function drawFineGrid(){
     
     if(cy < 0 || cy > 500) continue;
     
-    let v = vPow(k, 3, hLevel);
+    let v = vPow(k, BASE_B, hLevel);
     let alpha = 0.03 + (v / hLevel) * 0.22;
     alpha *= Math.min(1, viewport.scale / 2);
     
@@ -93,7 +93,7 @@ function drawFineGrid(){
     
     if(cx < 0 || cx > 500) continue;
     
-    let v = vPow(k, 2, vLevel);
+    let v = vPow(k, BASE_A, vLevel);
     let alpha = 0.03 + (v / vLevel) * 0.22;
     alpha *= Math.min(1, viewport.scale / 2);
     
@@ -142,37 +142,37 @@ function updateAxisLabels(){
   
   const viewWidth = 1/viewport.scale, viewHeight = 1/viewport.scale;
   
-  // 计算垂直网格线级别（基数3）
+  // 计算垂直网格线级别（基数BASE_B）
   let hLevel = 0;
   if(viewHeight > 0){
     const maxLinesInView = 100;
     let temp = 1;
-    while(temp * viewHeight <= maxLinesInView && hLevel < 12){ 
-      hLevel++; 
-      temp *= 3; 
+    while(temp * viewHeight <= maxLinesInView && hLevel < 12){
+      hLevel++;
+      temp *= BASE_B;
     }
-    if(temp * viewHeight > maxLinesInView && hLevel > 0){ 
-      hLevel--; 
-      temp /= 3; 
+    if(temp * viewHeight > maxLinesInView && hLevel > 0){
+      hLevel--;
+      temp /= BASE_B;
     }
   }
   
-  // 计算水平网格线级别（基数2）
+  // 计算水平网格线级别（基数BASE_A）
   let vLevel = 0;
   if(viewWidth > 0){
     const maxLinesInView = 100;
     let temp = 1;
-    while(temp * viewWidth <= maxLinesInView && vLevel < 16){ 
-      vLevel++; 
-      temp *= 2; 
+    while(temp * viewWidth <= maxLinesInView && vLevel < 16){
+      vLevel++;
+      temp *= BASE_A;
     }
-    if(temp * viewWidth > maxLinesInView && vLevel > 0){ 
-      vLevel--; 
-      temp /= 2; 
+    if(temp * viewWidth > maxLinesInView && vLevel > 0){
+      vLevel--;
+      temp /= BASE_A;
     }
   }
   
-  const H = 3**hLevel, V = 2**vLevel;
+  const H = BASE_B**hLevel, V = BASE_A**vLevel;
   
   // 更新Y轴标签
   yAxis.innerHTML = '';
@@ -188,8 +188,8 @@ function updateAxisLabels(){
     
     if(cy < 10 || cy > 490) continue;
     
-    let v = vPow(k, 3, hLevel);
-    let label = reverseBaseDigitsStr(k, 3, hLevel);
+    let v = vPow(k, BASE_B, hLevel);
+    let label = reverseBaseDigitsStr(k, BASE_B, hLevel);
     yCandidates.push({k, cy, v, label});
   }
   
@@ -224,8 +224,8 @@ function updateAxisLabels(){
     
     if(cx < 10 || cx > 490) continue;
     
-    let v = vPow(k, 2, vLevel);
-    let label = reverseBinaryStr(k, vLevel);
+    let v = vPow(k, BASE_A, vLevel);
+    let label = reverseBaseDigitsStr(k, BASE_A, vLevel);
     xCandidates.push({k, cx, v, label});
   }
   

@@ -64,10 +64,51 @@ function resizeMatrixCanvas() {
 }
 
 /**
+ * 更新矩阵坐标轴标签
+ */
+function updateMatrixAxisLabels() {
+  const yAxis = document.getElementById('matrix-y-axis-labels');
+  const xAxis = document.getElementById('matrix-x-axis-labels');
+  if (!yAxis || !xAxis) return;
+
+  // 清空现有标签
+  yAxis.innerHTML = '';
+  xAxis.innerHTML = '';
+
+  const cellSize = CELL_SIZE;
+  const size = gridSize;
+
+  // Y轴标签（左侧）
+  for (let m = 0; m < size; m++) {
+    const span = document.createElement('span');
+    span.className = 'axis-label';
+    span.textContent = (m+1).toString();
+    // 垂直位置：每个单元格中心，使用transform垂直居中
+    const top = m * cellSize + cellSize / 2;
+    span.style.top = `${top}px`;
+    span.style.transform = 'translateY(-50%)';
+    yAxis.appendChild(span);
+  }
+
+  // X轴标签（上方）
+  for (let n = 0; n < size; n++) {
+    const span = document.createElement('span');
+    span.className = 'axis-label';
+    span.textContent = (n+1).toString();
+    // 水平位置：每个单元格中心，使用transform水平居中
+    const left = n * cellSize + cellSize / 2;
+    span.style.left = `${left}px`;
+    span.style.transform = 'translateX(-50%)';
+    xAxis.appendChild(span);
+  }
+}
+
+/**
  * 刷新矩阵网格（公开接口）
  */
-function refreshMatrixGrid() { 
-  resizeMatrixCanvas(); 
+function refreshMatrixGrid() {
+  resizeMatrixCanvas();
+  updateMatrixAxisLabels();
 }
 
 /**

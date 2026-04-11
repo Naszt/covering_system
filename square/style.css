@@ -97,10 +97,11 @@ body {
 .matrix {
   background: transparent;
   border-radius: 6px;
-  padding: 4px;
+  padding: 4px 4px 4px 44px;
   min-width: 200px;
   max-height: 560px;
-  overflow: auto; /* 内容溢出时显示滚动条 */
+  overflow-y: auto;
+  overflow-x: visible;
 }
 
 /* 矩阵画布 */
@@ -249,7 +250,7 @@ textarea#rect-textarea {
 
 /* Y轴标签 */
 .axis-labels.y-axis {
-  left: -40px;
+  left: -37px;
   top: 10px;
   width: 45px;
   height: 500px;
@@ -299,4 +300,44 @@ textarea#rect-textarea {
   display: flex;
   gap: 4px;
   justify-content: center;
+}
+
+/* 矩阵画布包装器 */
+.matrix-canvas-wrapper {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 auto;
+}
+
+/* 矩阵坐标轴标签容器 - 覆盖原有定位 */
+.matrix-canvas-wrapper .axis-labels.y-axis {
+  left: -41px;
+  top: 0;
+  width: 40px;
+  height: 100%;
+  text-align: right;
+  padding-right: 6px;
+  position: absolute;
+}
+
+.matrix-canvas-wrapper .axis-labels.x-axis {
+  top: -12px;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  text-align: center;
+  position: absolute;
+}
+
+/* 矩阵坐标轴标签内部span */
+.matrix-canvas-wrapper .axis-label {
+  position: absolute;
+  white-space: nowrap;
+}
+
+/* Y轴标签右对齐 */
+.matrix-canvas-wrapper .axis-labels.y-axis .axis-label {
+  right: 0;
+  text-align: right;
 }

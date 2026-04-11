@@ -56,14 +56,18 @@
       </div>
       
       <!-- 矩阵控制：调整网格大小 -->
-      <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;align-items:center">
+      <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;align-items:center">
         <button class="act" id="grid-decrease" title="缩小网格">-</button>
         <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id="grid-size">9×9</span></div>
         <button class="act" id="grid-increase" title="扩大网格">+</button>
       </div>
       
       <!-- 矩阵画布：显示矩形类型和计数 -->
-      <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
+      <div class="matrix-canvas-wrapper">
+        <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
+        <div id="matrix-y-axis-labels" class="axis-labels y-axis"></div>
+        <div id="matrix-x-axis-labels" class="axis-labels x-axis"></div>
+      </div>
       
       <!-- 文本区域：显示和编辑矩形编码 -->
       <div style="margin:8px 0">

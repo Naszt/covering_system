@@ -8,6 +8,11 @@ function init(){
   // 初始化矩阵网格
   refreshMatrixGrid();
   
+  // 初始化关卡系统
+  initLevels();
+  bindLevelButtons();
+  updateLevelButtons();
+  
   // 绑定矩阵画布点击事件
   matrixCanvas.addEventListener('click', onMatrixClick);
   

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>世界1 - 关卡选择</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      padding: 8px;
+    }
+    .container {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 600px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 1rem;
+    }
+    .level-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 30px;
+    }
+    .level-btn {
+      background: #4a90e2;
+      border: 0;
+      color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .level-btn:hover {
+      background: #3a80d2;
+    }
+    .level-btn:active {
+      transform: translateY(1px);
+    }
+    .level-btn.disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .level-title {
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+    }
+    .level-desc {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 30px;
+      color: #4a90e2;
+      text-decoration: none;
+      font-size: 1rem;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .world-description {
+      margin-top: 20px;
+      color: #777;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      text-align: left;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>世界1</h1>
+    <p class="subtitle">每个矩形类型最多只能使用一次，部分矩形被禁用。</p>
+    <div class="level-grid">
+      <a href="../exploration/?level=1-1" class="level-btn">
+        <span class="level-title">关卡 1-1</span>
+        <span class="level-desc">教程关 · 禁用 (0,0)</span>
+      </a>
+      <a href="../exploration/?level=1-2" class="level-btn">
+        <span class="level-title">关卡 1-2</span>
+        <span class="level-desc">禁用 (0,0),(1,0)</span>
+      </a>
+      <a href="../exploration/?level=1-3" class="level-btn">
+        <span class="level-title">关卡 1-3</span>
+        <span class="level-desc">禁用 (0,0),(1,0),(1,1)</span>
+      </a>
+      <a href="../exploration/?level=1-4" class="level-btn">
+        <span class="level-title">关卡 1-4</span>
+        <span class="level-desc">底数 a=2,b=2 · 禁用 (0,0)</span>
+      </a>
+    </div>
+    <div class="world-description">
+      <p><strong>世界规则</strong>：</p>
+      <ul>
+        <li>每个矩形类型（n,m）在整个关卡中最多只能使用一次。</li>
+        <li>被禁用的矩形类型无法被选中或放置。</li>
+        <li>目标是用允许的矩形完全覆盖单位正方形（覆盖率100%）。</li>
+        <li>完成一个关卡后会自动解锁下一个关卡（进度保存在本地）。</li>
+      </ul>
+      <p>点击任意关卡开始挑战。你可以随时返回此页面选择其他关卡。</p>
+    </div>
+    <a href="../" class="back-link">← 返回首页</a>
+  </div>
+</body>
+</html>

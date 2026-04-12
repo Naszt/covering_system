@@ -30,9 +30,9 @@ function updateCoverage(){
     
     // 收集所有x坐标边界
     const xs = new Set();
-    rects.forEach(r => { 
-      xs.add(r.x); 
-      xs.add(r.x + getRectWidth(r.n)); 
+    rects.forEach(r => {
+      xs.add(r.x);
+      xs.add(r.x + getRectWidth(r.n));
     });
     
     const xsArr = Array.from(xs).sort((a,b) => a-b);
@@ -75,4 +75,7 @@ function updateCoverage(){
   
   const area = computeUnionArea(rectangles);
   covEl.innerText = '覆盖率: ' + (area*100).toFixed(2) + '%';
+  
+  // 检查关卡完成
+  checkLevelCompletion(area);
 }

@@ -33,12 +33,18 @@ function addRectangle(n, m, x, y, autoSelect = true){
   // 检查边界
   if(x < 0 || y < 0 || x + w > 1 || y + h > 1) return 0;
   
+  // 检查关卡限制
+  if (!canAddRectangle(n, m)) {
+    console.log(`无法添加矩形 (${n},${m})，已达到使用上限或被禁用`);
+    return 0;
+  }
+  
   let id = nextId++;
   rectangles.push({id, n, m, x, y});
   
   if(autoSelect) selectedId = id;
   
-  updateCount(); 
+  updateCount();
   drawAll();
   
   // 不清空 currentShape，允许连续放置相同形状

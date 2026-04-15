@@ -1,0 +1,51 @@
+{
+  "id": "world1",
+  "title": "世界1",
+  "description": "学习覆盖系统的基本概念，每个矩形类型最多只能使用一次，部分矩形被禁用。",
+  "levels": [
+    {
+      "id": "1-1",
+      "title": "教程关",
+      "description": "学习基本操作。限制：不能使用矩形 (0,0)。",
+      "a": 2,
+      "b": 3,
+      "disabledRectangles": [[0, 0]],
+      "maxUsesPerRectangle": 1,
+      "unlocked": true,
+      "completed": false
+    },
+    {
+      "id": "1-2",
+      "title": "进阶关",
+      "description": "增加一个禁用矩形。限制：不能使用 (0,0) 和 (1,0)。",
+      "a": 2,
+      "b": 3,
+      "disabledRectangles": [[0, 0], [1, 0]],
+      "maxUsesPerRectangle": 1,
+      "unlocked": false,
+      "completed": false
+    },
+    {
+      "id": "1-3",
+      "title": "挑战关",
+      "description": "更多禁用矩形。限制：不能使用 (0,0), (1,0), (1,1)。",
+      "a": 2,
+      "b": 3,
+      "disabledRectangles": [[0, 0], [1, 0], [1, 1]],
+      "maxUsesPerRectangle": 1,
+      "unlocked": false,
+      "completed": false
+    },
+    {
+      "id": "1-4",
+      "title": "变底数关",
+      "description": "底数 a=2, b=2。限制：不能使用 (0,0)。",
+      "a": 2,
+      "b": 2,
+      "disabledRectangles": [[0, 0]],
+      "maxUsesPerRectangle": 1,
+      "unlocked": false,
+      "completed": false
+    }
+  ]
+}

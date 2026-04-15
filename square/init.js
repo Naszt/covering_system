@@ -4,12 +4,38 @@
 /**
  * 应用程序初始化
  */
-function init(){
+async function init(){
+  // 解析 URL 参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const modeParam = urlParams.get('mode');
+  const worldParam = urlParams.get('world');
+  const levelParam = urlParams.get('level');
+
+  // 判断是否为选关页面：有 world 参数，但没有 level 和 mode
+  const isLevelSelectPage = worldParam !== null && levelParam === null && modeParam === null;
+
+  // 获取页面元素
+  const levelSelectPage = document.getElementById('level-select-page');
+  const gamePage = document.querySelector('.main');
+
+  if (isLevelSelectPage) {
+    // 显示选关页面，隐藏游戏页面
+    if (levelSelectPage) levelSelectPage.style.display = 'flex';
+    if (gamePage) gamePage.style.display = 'none';
+    // 选关页面无需进一步初始化
+    return;
+  } else {
+    // 显示游戏页面，隐藏选关页面
+    if (levelSelectPage) levelSelectPage.style.display = 'none';
+    if (gamePage) gamePage.style.display = 'flex';
+  }
+
+  // 以下是原有的游戏初始化逻辑
   // 初始化矩阵网格
   refreshMatrixGrid();
   
-  // 初始化关卡系统
-  initLevels();
+  // 初始化关卡系统（异步）
+  await initLevels();
   bindLevelButtons();
   updateLevelButtons();
   
@@ -51,9 +77,14 @@ function init(){
 // 使用IIFE封装代码，防止污染全局作用域
 (function(){
   // 等待DOM加载完成后初始化
+  const start = () => {
+    init().catch(err => {
+      console.error('初始化失败:', err);
+    });
+  };
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    init();
+    start();
   }
 })();

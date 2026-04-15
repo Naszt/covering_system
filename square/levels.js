@@ -1,6 +1,7 @@
 /*
  * 覆盖系统可视化工具 - 关卡管理模块
  * 该文件包含关卡数据定义、状态管理和进度存储
+ * 支持从外部 JSON 文件加载关卡定义
  */
 
 // ======================= 关卡数据定义 =======================
@@ -19,76 +20,116 @@
  * @property {boolean} completed - 是否已完成（由进度管理）
  */
 
-// 世界1的关卡数据
-const WORLD_1_LEVELS = [
-  {
-    id: '1-1',
-    title: '教程关',
-    description: '学习基本操作。限制：不能使用矩形 (0,0)。',
-    a: 2,
-    b: 3,
-    disabledRectangles: [[0, 0]],
-    maxUsesPerRectangle: 1,
-    unlocked: true, // 第一关默认解锁
-    completed: false
-  },
-  {
-    id: '1-2',
-    title: '进阶关',
-    description: '增加一个禁用矩形。限制：不能使用 (0,0) 和 (1,0)。',
-    a: 2,
-    b: 3,
-    disabledRectangles: [[0, 0], [1, 0]],
-    maxUsesPerRectangle: 1,
-    unlocked: false,
-    completed: false
-  },
-  {
-    id: '1-3',
-    title: '挑战关',
-    description: '更多禁用矩形。限制：不能使用 (0,0), (1,0), (1,1)。',
-    a: 2,
-    b: 3,
-    disabledRectangles: [[0, 0], [1, 0], [1, 1]],
-    maxUsesPerRectangle: 1,
-    unlocked: false,
-    completed: false
-  },
-  {
-    id: '1-4',
-    title: '变底数关',
-    description: '底数 a=2, b=2。限制：不能使用 (0,0)。',
-    a: 2,
-    b: 2,
-    disabledRectangles: [[0, 0]],
-    maxUsesPerRectangle: 1,
-    unlocked: false,
-    completed: false
-  }
-];
+/** 所有关卡数据映射 */
+let levelMap = {};
 
-// 自由探索模式（无限制）
-const FREE_EXPLORATION_MODE = {
-  id: 'free',
-  title: '自由探索',
-  description: '无任何限制，自由使用所有矩形。',
-  a: 2,
-  b: 3,
-  disabledRectangles: [],
-  maxUsesPerRectangle: Infinity, // 不限次数
-  unlocked: true,
-  completed: false
-};
-
-// ======================= 关卡状态管理 =======================
+/** 世界列表 */
+let worlds = [];
 
 /** 当前选中的关卡ID */
 let currentLevelId = 'free'; // 默认自由探索
 
-/** 所有关卡数据映射 */
-const levelMap = {};
-WORLD_1_LEVELS.forEach(level => levelMap[level.id] = level);
-levelMap['free'] = FREE_EXPLORATION_MODE;
+// ======================= 数据加载 =======================
+
+/**
+ * 从 JSON 文件加载关卡数据
+ * 默认加载 levels/world1.json 和 levels/free.json
+ */
+async function loadLevels() {
+  try {
+    // 加载自由探索模式
+    const freeResponse = await fetch('levels/free.json');
+    if (!freeResponse.ok) throw new Error('无法加载 free.json');
+    const freeData = await freeResponse.json();
+    levelMap[freeData.id] = freeData;
+
+    // 加载世界1
+    const world1Response = await fetch('levels/world1.json');
+    if (!world1Response.ok) throw new Error('无法加载 world1.json');
+    const world1Data = await world1Response.json();
+    worlds.push(world1Data);
+    world1Data.levels.forEach(level => {
+      levelMap[level.id] = level;
+    });
+
+    console.log(`已加载 ${world1Data.levels.length} 个关卡和自由探索模式`);
+  } catch (error) {
+    console.error('加载关卡数据失败，使用内置默认数据', error);
+    // 回退到内置默认数据（与之前相同）
+    loadFallbackLevels();
+  }
+}
+
+/**
+ * 内置默认关卡数据（当 JSON 加载失败时使用）
+ */
+function loadFallbackLevels() {
+  const WORLD_1_LEVELS = [
+    {
+      id: '1-1',
+      title: '教程关',
+      description: '学习基本操作。限制：不能使用矩形 (0,0)。',
+      a: 2,
+      b: 3,
+      disabledRectangles: [[0, 0]],
+      maxUsesPerRectangle: 1,
+      unlocked: true,
+      completed: false
+    },
+    {
+      id: '1-2',
+      title: '进阶关',
+      description: '增加一个禁用矩形。限制：不能使用 (0,0) 和 (1,0)。',
+      a: 2,
+      b: 3,
+      disabledRectangles: [[0, 0], [1, 0]],
+      maxUsesPerRectangle: 1,
+      unlocked: false,
+      completed: false
+    },
+    {
+      id: '1-3',
+      title: '挑战关',
+      description: '更多禁用矩形。限制：不能使用 (0,0), (1,0), (1,1)。',
+      a: 2,
+      b: 3,
+      disabledRectangles: [[0, 0], [1, 0], [1, 1]],
+      maxUsesPerRectangle: 1,
+      unlocked: false,
+      completed: false
+    },
+    {
+      id: '1-4',
+      title: '变底数关',
+      description: '底数 a=2, b=2。限制：不能使用 (0,0)。',
+      a: 2,
+      b: 2,
+      disabledRectangles: [[0, 0]],
+      maxUsesPerRectangle: 1,
+      unlocked: false,
+      completed: false
+    }
+  ];
+
+  const FREE_EXPLORATION_MODE = {
+    id: 'free',
+    title: '自由探索',
+    description: '无任何限制，自由使用所有矩形。',
+    a: 2,
+    b: 3,
+    disabledRectangles: [],
+    maxUsesPerRectangle: Infinity,
+    unlocked: true,
+    completed: false
+  };
+
+  worlds = [{ id: 'world1', title: '世界1', levels: WORLD_1_LEVELS }];
+  levelMap = {};
+  WORLD_1_LEVELS.forEach(level => levelMap[level.id] = level);
+  levelMap['free'] = FREE_EXPLORATION_MODE;
+}
+
+// ======================= 关卡状态管理 =======================
 
 /** 从本地存储加载关卡进度 */
 function loadLevelProgress() {
@@ -244,27 +285,56 @@ function checkLevelCompletion(coverage) {
 }
 
 /** 初始化关卡系统 */
-function initLevels() {
+async function initLevels() {
+  // 加载关卡数据
+  await loadLevels();
+  
+  // 加载进度
   loadLevelProgress();
   
   // 确保第一关已解锁
-  if (WORLD_1_LEVELS[0]) {
-    WORLD_1_LEVELS[0].unlocked = true;
+  const firstWorld = worlds[0];
+  if (firstWorld && firstWorld.levels[0]) {
+    firstWorld.levels[0].unlocked = true;
   }
   
   // 默认切换到自由探索模式
   currentLevelId = 'free';
-  // 注意：不自动切换关卡，由用户选择
   
-  // 检查 URL 参数，如果有关卡参数则自动切换到该关卡
+  // 解析 URL 参数
   const urlParams = new URLSearchParams(window.location.search);
   const levelParam = urlParams.get('level');
+  
+  // 如果指定了 level 参数，尝试切换到该关卡
   if (levelParam && levelMap[levelParam]) {
-    // 确保关卡已解锁（如果未解锁，仍然可以切换到自由探索）
     if (levelMap[levelParam].unlocked) {
       switchLevel(levelParam);
     } else {
       console.warn(`关卡 ${levelParam} 尚未解锁，保持自由探索模式`);
+    }
+  }
+  
+  // 向后兼容旧版 world 和 mode 参数
+  const worldParam = urlParams.get('world');
+  const modeParam = urlParams.get('mode');
+  if (modeParam === 'sandbox') {
+    // 保持自由探索模式
+    console.log('沙盒模式：自由探索');
+  } else if (worldParam !== null) {
+    // 构建关卡ID
+    let levelId;
+    const levelNum = urlParams.get('level');
+    if (levelNum !== null) {
+      levelId = `${worldParam}-${levelNum}`;
+    } else {
+      levelId = `${worldParam}-1`;
+    }
+    if (levelMap[levelId] && levelMap[levelId].unlocked) {
+      switchLevel(levelId);
+    } else if (levelMap[levelId]) {
+      console.warn(`关卡 ${levelId} 尚未解锁，保持自由探索模式`);
+    } else {
+      console.warn(`关卡 ${levelId} 不存在，保持自由探索模式`);
     }
   }
 }

@@ -1,0 +1,11 @@
+{
+  "id": "free",
+  "title": "自由探索",
+  "description": "无任何限制，自由使用所有矩形。",
+  "a": 2,
+  "b": 3,
+  "disabledRectangles": [],
+  "maxUsesPerRectangle": 999,
+  "unlocked": true,
+  "completed": false
+}

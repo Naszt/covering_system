@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>覆盖系统可视化工具 - 入口</title>
+  <title>入口 - 覆盖系统</title>
   <style>
     * {
       box-sizing: border-box;
@@ -46,50 +46,38 @@
       margin-top: 30px;
     }
     .btn {
-      background: #4a90e2;
+      background: #8800ff;
       border: 0;
       color: #fff;
       padding: 16px 24px;
       border-radius: 8px;
       font-size: 1.2rem;
-      font-weight: 500;
+      font-weight: 300;
       cursor: pointer;
       transition: background-color 0.2s;
       text-decoration: none;
       display: block;
     }
     .btn:hover {
-      background: #3a80d2;
+      background: #8800ff88;
     }
     .btn:active {
       transform: translateY(1px);
     }
     .btn-explore {
-      background: #2ecc71;
+      background: #8800ff;
     }
     .btn-explore:hover {
-      background: #27ae60;
-    }
-    .description {
-      margin-top: 30px;
-      color: #777;
-      font-size: 0.9rem;
-      line-height: 1.5;
+      background: #8800ff88;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>覆盖系统可视化工具</h1>
-    <p class="subtitle">通过交互式矩形覆盖探索剩余类的构造</p>
+    <h1>「Covering System」</h1>
     <div class="buttons">
-      <a href="game.html?level=free" class="btn btn-explore">自由探索</a>
-      <a href="game.html?world=1" class="btn">世界1</a>
-    </div>
-    <div class="description">
-      <p><strong>自由探索</strong>：无任何限制，可以任意使用所有矩形类型，适合学习和实验。</p>
-      <p><strong>世界1</strong>：每个矩形类型最多只能使用一次，部分矩形被禁用，挑战用有限的资源实现完全覆盖。</p>
-      <p>所有进度会自动保存在本地，关闭页面后可以继续。</p>
+      <a href="game.html?level=free" class="btn btn-explore">sandbox</a>
+      <a href="game.html?world=1" class="btn">world-1</a>
     </div>
   </div>
 </body>

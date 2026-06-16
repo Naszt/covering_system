@@ -61,10 +61,9 @@
 
 现在所有功能都集成在 `game.html` 中，可以通过查询参数直接进入特定模式：
 
-- `game.html?mode=sandbox` – 自由探索（沙盒）模式，无任何限制。
-- `game.html?world=1` – 进入世界1，自动选择第一个关卡（1-1）。
-- `game.html?world=1&level=3` – 直接进入世界1的第3关（1-3）。
-- `game.html?level=1-2` – 旧式参数，直接进入关卡1-2（向后兼容）。
+- `game.html?level=free` – 自由探索（沙盒）模式，无任何限制。
+- `game.html?world=1` – 进入世界1。
+- `game.html?level=1-2` – 进入关卡1-2。
 
 参数会在页面加载时自动生效，同时页面内的关卡选择面板会同步高亮显示当前关卡。
 

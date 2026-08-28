@@ -1,6 +1,21 @@
 # Covering System
 
-这是 Visualization 项目，暂时不打算搞了。
+这是覆盖系统的交互式 Visualization 项目。首页现在并列提供两个实验空间：
+
+- [`tree.html`](tree.html)：树形覆盖，把文章中的前缀表达式直接解析成可拖动的树。
+- [`game.html`](game.html)：矩形覆盖，可读取同一套前缀表达式或原有坐标编码。
+
+树形覆盖的输入由 `01_主线/形式化验证/code/covering.hpp` 编译成的 WebAssembly 直接解析。网页不再维护一套独立的正式语法；`cpp/parser_bridge.cpp` 只负责把 C++ AST 无损地转换成页面使用的 JSON，不修改验证器。`0` 与 `1` 分别画成白色与黑色圆叶子，普通树节点只保留分叉线，递归树的最后一支以加粗箭头收尾。
+
+在本目录运行：
+
+```powershell
+node server.js
+```
+
+然后访问 `http://127.0.0.1:4173/tree.html`。树形覆盖与矩形覆盖运行时都调用这个 WebAssembly 解析器；包括 `5^\uparrow(...)`、Unicode `5↑(...)`、`p_w↑A` 与 `p↑_wA` 在内的输入都走同一个 C++ `Parser`。修改 `covering.hpp` 后运行 `cpp/build-wasm.ps1` 重建浏览器模块。
+
+`tree/syntax-contract.json` 是网页解析器与 `covering.hpp` 的共享样例契约。运行 `node tree/parser.test.js` 检查网页语义；运行 `node tree/parser.sync.test.js` 会临时编译一个很薄的 C++ 探针，并把两套解析器对同一批输入的接受行为与公共归一形逐项比较。以后修改符号时，先改这份契约，任一实现未同步都会直接报错。
 
 ## 问题
 

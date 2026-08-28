@@ -69,15 +69,29 @@ function getRectHeight(m) {
   return 1 / Math.pow(BASE_B, m); 
 }
 
+// 低饱和色板：颜色只承担类型辨识，不改变整体的简洁排版。
+const RECT_COLORS = [
+  '#4c78a8', '#df785e', '#5b9a57', '#8b6caf',
+  '#d29a37', '#408c89', '#b56576', '#748447',
+  '#9c7048', '#587d9d', '#bd6f91', '#7188bd'
+];
+
 /**
- * 根据矩形的n,m值生成边框颜色（使用HSL色彩空间）
+ * 根据矩形的 n,m 值取得稳定的类型颜色。
  * @param {number} n - 宽度指数
  * @param {number} m - 高度指数
- * @returns {string} HSL颜色字符串
+ * @param {number} alpha - 透明度
+ * @returns {string} 十六进制或 rgba 颜色字符串
  */
+function getRectColor(n, m, alpha = 1) {
+  const color = RECT_COLORS[(n * 5 + m * 7) % RECT_COLORS.length];
+  if(alpha >= 1) return color;
+  const [r, g, b] = color.slice(1).match(/.{2}/g).map(part => parseInt(part, 16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getRectBorderColor(n,m) {
-  const hue = (n * 37 + m * 73) % 360; // 使用质数乘法避免颜色重复
-  return `hsl(${hue}, 80%, 60%)`;
+  return getRectColor(n, m);
 }
 
 /**
@@ -91,15 +105,17 @@ function getRectCount(n,m) {
 }
 
 /**
- * 根据出现次数获取右侧矩阵格子的背景色
+ * 根据类型与出现次数获取右侧矩阵格子的背景色
  * @param {number} count - 出现次数
+ * @param {number} n - 宽度指数
+ * @param {number} m - 高度指数
  * @returns {string} 颜色值
  */
-function getCountColor(count) {
-  if(count === 0) return '#ffffff';   // 白色 - 未使用
-  if(count === 1) return '#e9e9e9';   // 浅灰 - 使用1次
-  if(count === 2) return '#cccccc';   // 中灰 - 使用2次
-  return '#999999';           // 深灰 - 使用3次及以上
+function getCountColor(count, n, m) {
+  if(count === 0) return getRectColor(n, m, 0.035);
+  if(count === 1) return getRectColor(n, m, 0.18);
+  if(count === 2) return getRectColor(n, m, 0.36);
+  return getRectColor(n, m, 0.62);
 }
 
 /**

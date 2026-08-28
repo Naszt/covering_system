@@ -5,6 +5,8 @@
  * 使用新参数重新初始化
  */
 function reinitWithNewParams(){
+  const preservedExpression = textareaMode === 'expression' ? expressionSource : '';
+  if(!preservedExpression) switchTextareaToRectangleMode();
   rectangles = []; 
   selectedId = null; 
   isDragging = false;
@@ -22,9 +24,16 @@ function reinitWithNewParams(){
   const ta = document.getElementById('rect-textarea');
   if(ta){
     suppressTextarea = true;
-    ta.value = '';
+    ta.value = preservedExpression;
     suppressTextarea = false;
-    saveToHistory('');
+    if(preservedExpression){
+      expressionSource = preservedExpression;
+      textareaMode = 'expression';
+      parseTextareaAndLoad();
+      saveToHistory(preservedExpression);
+    } else {
+      saveToHistory('');
+    }
   }
 }
 

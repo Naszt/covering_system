@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>覆盖系统</title>
+  <title>矩形覆盖 · Covering System</title>
   <!-- 外部CSS文件 -->
-  <link rel="stylesheet" href="square/style.css">
+  <link rel="stylesheet" href="square/style.css?v=20260828f">
   <style>
     /* 选关页面样式 */
     #level-select-page {
@@ -14,7 +14,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: #f5f5f5;
+      background: #fff;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -24,13 +24,12 @@
       text-align: center;
       background: #fff;
       padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border: 1px solid #111;
       max-width: 400px;
       width: 90%;
     }
     #level-select-page .level-select-container h1 {
-      color: #333;
+      color: #111;
       margin-top: 0;
       margin-bottom: 30px;
       font-size: 2rem;
@@ -42,21 +41,21 @@
       margin-bottom: 30px;
     }
     #level-select-page .level-btn {
-      background: #4a90e2;
-      border: 0;
-      color: #fff;
+      background: #fff;
+      border: 1px solid #315f7d;
+      color: #315f7d;
       padding: 20px;
-      border-radius: 8px;
+      border-radius: 0;
       font-size: 1.5rem;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s;
       text-decoration: none;
       display: block;
       text-align: center;
     }
     #level-select-page .level-btn:hover {
-      background: #3a80d2;
+      color: #fff;
+      background: #315f7d;
     }
     #level-select-page .level-btn:active {
       transform: translateY(1px);
@@ -64,15 +63,15 @@
     #level-select-page .level-btn.disabled {
       opacity: 0.5;
       cursor: not-allowed;
-      background: #a0a0a0;
+      background: #eee;
     }
     #level-select-page .level-btn.active {
-      background: #2e7acc;
-      box-shadow: inset 0 0 0 2px #fff;
+      color: #fff;
+      background: #315f7d;
     }
     #level-select-page .back-link {
       display: inline-block;
-      color: #4a90e2;
+      color: #111;
       text-decoration: none;
       font-size: 1rem;
     }
@@ -83,6 +82,14 @@
   <!-- 页面内注释：该应用用于可视化覆盖系统，支持动态调整底数a和b，添加/删除/移动矩形，计算覆盖率 -->
 </head>
 <body>
+  <header class="topbar">
+    <a class="brand" href="index.html">Covering System</a>
+    <nav aria-label="可视化项目">
+      <a href="tree.html">树形覆盖</a>
+      <a class="active" href="game.html?level=free" aria-current="page">矩形覆盖</a>
+    </nav>
+  </header>
+
   <div id="level-select-page" style="display: none;">
     <div class="level-select-container">
       <h1>世界1</h1>
@@ -134,47 +141,51 @@
     <!-- 右侧：矩阵面板和控制区域 -->
     <div class="matrix">
       <!-- 返回链接 -->
-      <div style="margin-bottom: 16px; font-size: 0.9rem;">
-        <a href="game.html?world=1" style="color: #4a90e2; text-decoration: none;">← 返回世界1选关</a>
-        &nbsp;|&nbsp;
-        <a href="index.html" style="color: #4a90e2; text-decoration: none;">返回首页</a>
+      <div class="workspace-nav">
+        <a href="game.html?world=1">世界 1</a>
+        <a href="tree.html">树形覆盖</a>
+        <a href="index.html">首页</a>
       </div>
       
       <!-- 参数面板：用于设置底数a和b -->
       <div class="param-panel">
         <label>a =</label>
-        <input type="number" id="paramA" min="2" max="10" value="2" step="1" style="width:55px">
+        <input type="number" id="paramA" min="2" max="10" value="2" step="1">
         <label>b =</label>
-        <input type="number" id="paramB" min="2" max="10" value="3" step="1" style="width:55px">
-        <button class="act" id="applyParams" style="padding:2px 8px">应用</button>
+        <input type="number" id="paramB" min="2" max="10" value="3" step="1">
+        <button class="act" id="applyParams">应用</button>
       </div>
       
       <!-- 矩阵控制：调整网格大小 -->
-      <div class="matrix-controls" style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;align-items:center">
+      <div class="matrix-controls">
         <button class="act" id="grid-decrease" title="缩小网格">-</button>
-        <div style="font-weight:600;color:#333;font-size:0.85rem">大小: <span id="grid-size">9×9</span></div>
+        <div class="grid-size-label">大小 <span id="grid-size">9×9</span></div>
         <button class="act" id="grid-increase" title="扩大网格">+</button>
       </div>
       
       <!-- 矩阵画布：显示矩形类型和计数 -->
       <div class="matrix-canvas-wrapper">
-        <canvas id="matrixCanvas" style="display:block; background:#fff; border:1px solid #ccc; border-radius:6px; cursor:pointer;"></canvas>
+        <canvas id="matrixCanvas"></canvas>
         <div id="matrix-y-axis-labels" class="axis-labels y-axis"></div>
         <div id="matrix-x-axis-labels" class="axis-labels x-axis"></div>
       </div>
       
       <!-- 文本区域：显示和编辑矩形编码 -->
-      <div style="margin:8px 0">
-        <textarea id="rect-textarea" placeholder="存储格式: (xrev+a^n)(yrev+b^m) 例如 (1+2^1)(0+3^1)"></textarea>
+      <div class="textarea-wrap">
+        <textarea id="rect-textarea" placeholder="输入树形覆盖算式，或坐标编码 (xrev+a^n)(yrev+b^m)"></textarea>
+        <div class="expression-tools">
+          <span id="rect-parse-message" role="status" aria-live="polite">支持与树形覆盖相同的前缀表达式。</span>
+          <label>递归展开 <input id="prefix-recursion-depth" type="number" min="1" max="20" value="6"></label>
+        </div>
       </div>
       
       <!-- 操作按钮 -->
-      <div class="acts" style="flex-direction: column; gap: 4px;">
-        <div style="display: flex; gap: 4px; justify-content: center;">
+      <div class="acts">
+        <div class="action-row">
           <button class="act" id="clear">Clear</button>
           <button class="act" id="del">[D]elete</button>
         </div>
-        <div style="display: flex; justify-content: center;">
+        <div class="action-row">
           <button class="act" id="usage">使用说明</button>
         </div>
       </div>
@@ -196,17 +207,19 @@
     square/events.js   - 鼠标、键盘、滚动条等事件处理
     square/init.js    - 应用程序初始化、DOMContentLoaded入口
   -->
-  <script src="square/core.js"></script>
-  <script src="square/levels.js"></script>
-  <script src="square/encoding.js"></script>
-  <script src="square/drawing.js"></script>
-  <script src="square/matrix.js"></script>
-  <script src="square/coverage.js"></script>
-  <script src="square/history.js"></script>
-  <script src="square/rectangles.js"></script>
-  <script src="square/params.js"></script>
-  <script src="square/events.js"></script>
-  <script src="square/init.js"></script>
+  <script src="tree/cpp-parser.js?v=20260828c"></script>
+  <script src="square/prefix.js?v=20260828g"></script>
+  <script src="square/core.js?v=20260828f"></script>
+  <script src="square/levels.js?v=20260828f"></script>
+  <script src="square/encoding.js?v=20260828f"></script>
+  <script src="square/drawing.js?v=20260828f"></script>
+  <script src="square/matrix.js?v=20260828f"></script>
+  <script src="square/coverage.js?v=20260828f"></script>
+  <script src="square/history.js?v=20260828g"></script>
+  <script src="square/rectangles.js?v=20260828f"></script>
+  <script src="square/params.js?v=20260828f"></script>
+  <script src="square/events.js?v=20260828f"></script>
+  <script src="square/init.js?v=20260828g"></script>
   
   <!-- 页面内注释：应用功能包括：
      1. 支持底数a和b的动态调整（2-10）

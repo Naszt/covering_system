@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="树形覆盖：覆盖系统前缀表达式的交互树。">
+  <title>树形覆盖 · Covering System</title>
+  <link rel="stylesheet" href="tree/style.css?v=20260828g">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">Covering System</a>
+    <nav aria-label="可视化项目">
+      <a class="active" href="tree.html" aria-current="page">树形覆盖</a>
+      <a href="game.html?level=free">矩形覆盖</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="input-area" aria-labelledby="page-title">
+      <div class="title-row">
+        <div>
+          <p class="kicker">Tree covering</p>
+          <h1 id="page-title">树形覆盖</h1>
+        </div>
+        <div class="title-actions">
+          <button id="reset-layout" class="quiet-button" type="button">复位布局</button>
+          <button id="settings-toggle" class="quiet-button" type="button" aria-expanded="false" aria-controls="settings-panel">设置</button>
+        </div>
+      </div>
+
+      <section id="settings-panel" class="settings-panel" aria-label="树形覆盖设置" hidden>
+        <label>节点大小 <input type="range" min="8" max="22" step="1" value="12" data-setting="nodeRadius"><output>12</output></label>
+        <label>层间距 <input type="range" min="56" max="160" step="2" value="92" data-setting="levelGap"><output>92</output></label>
+        <label>分支间距 <input type="range" min="8" max="64" step="1" value="18" data-setting="treeGap"><output>18</output></label>
+        <label>树间距 <input type="range" min="24" max="120" step="2" value="54" data-setting="sumGap"><output>54</output></label>
+        <label>横向活动 <input type="range" min="16" max="90" step="2" value="40" data-setting="maxNudge"><output>40</output></label>
+        <label>纵向浮动 <input type="range" min="0" max="24" step="1" value="10" data-setting="verticalFlex"><output>10</output></label>
+        <label>回弹程度 <input type="range" min="0" max="100" step="5" value="60" data-setting="elasticity"><output>60</output></label>
+        <button id="settings-reset" class="settings-reset" type="button">恢复默认</button>
+      </section>
+
+      <form id="expression-form">
+        <label for="expression">表达式</label>
+        <div class="expression-row">
+          <textarea id="expression" rows="2" spellcheck="false">5^\uparrow(1,2^\uparrow,3^\uparrow,0)+7^\uparrow(1,2^\uparrow,3^\uparrow,5^\uparrow\_3,5^\uparrow\_32^\uparrow,5^\uparrow\_33^\uparrow)</textarea>
+          <button class="render-button" type="submit">绘制</button>
+        </div>
+        <div class="input-meta">
+          <p id="parse-message" role="status" aria-live="polite">0 是白色叶子，1 是黑色叶子，↑ 表示递归分支。</p>
+        </div>
+      </form>
+
+      <section class="proof-panel" aria-labelledby="proof-title">
+        <div class="proof-heading">
+          <div>
+            <p class="kicker">Proof replay · covering.hpp</p>
+            <h2 id="proof-title">证明回放</h2>
+          </div>
+          <div class="proof-controls" aria-label="证明播放控制">
+            <button id="proof-previous" class="quiet-button" type="button" disabled>上一步</button>
+            <button id="proof-play" class="proof-play" type="button" disabled>播放</button>
+            <button id="proof-next" class="quiet-button" type="button" disabled>下一步</button>
+          </div>
+        </div>
+        <div id="proof-timeline" class="proof-timeline" role="list" aria-label="形式化推导步骤"></div>
+        <div class="proof-current">
+          <span id="proof-rule" class="proof-rule">等待 C++ 轨迹</span>
+          <code id="proof-equation">绘制表达式后生成可重放的 plus 步骤。</code>
+          <button id="proof-detail-toggle" class="quiet-button" type="button" aria-expanded="false" aria-controls="proof-detail" hidden>查看内部等式</button>
+        </div>
+        <pre id="proof-detail" class="proof-detail" hidden><code></code></pre>
+        <p id="proof-status" class="proof-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+
+    <section class="canvas-section" aria-label="表达式树画布">
+      <div id="canvas-viewport">
+        <svg id="tree-canvas" role="tree" aria-label="可拖动的前缀表达式树"></svg>
+      </div>
+      <div class="canvas-caption">
+        <div class="legend" aria-label="图例">
+          <span><i class="leaf-sample white"></i>0</span>
+          <span><i class="leaf-sample black"></i>1</span>
+          <span><i class="arrow-sample">→</i>递归</span>
+          <span><i class="sum-sample">+</i>相加</span>
+        </div>
+        <p>拖动根节点时位移会沿连线逐层传递；同层节点始终保持全局顺序与间距，不同树之间也不会交叉。</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="tree/cpp-parser.js?v=20260828c"></script>
+  <script src="tree/app.js?v=20260828k"></script>
+</body>
+</html>

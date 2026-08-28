@@ -261,27 +261,56 @@ function drawRect(r, isSelected){
   const bottomRight = logicalToCanvas(x + wLog, y);
   const canvasW = bottomRight.x - topLeft.x, canvasH = bottomRight.y - topLeft.y;
   
-  if(isSelected){
-    // 选中状态：黄色半透明填充，深色边框
-    ctx.fillStyle = 'rgba(255,240,160,0.5)';
-    ctx.fillRect(topLeft.x, topLeft.y, canvasW, canvasH);
-    ctx.strokeStyle = 'rgba(180,120,30,0.8)';
-    ctx.lineWidth = 2;
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.strokeRect(topLeft.x + 1, topLeft.y + 1, canvasW - 2, canvasH - 2);
-    ctx.restore();
+  // 每种 (n,m) 使用稳定的低饱和颜色；透明填充保留重叠关系。
+  ctx.fillStyle = getRectColor(n, m, isSelected ? 0.28 : 0.17);
+  ctx.fillRect(topLeft.x, topLeft.y, canvasW, canvasH);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(topLeft.x, topLeft.y, canvasW, canvasH);
+  ctx.clip();
+  ctx.strokeStyle = getRectColor(n, m, isSelected ? 0.68 : 0.36);
+  ctx.lineWidth = 0.65;
+  const spacing = 7 + ((n + m) % 3) * 2;
+  if((n + m) % 2 === 0){
+    for(let offset = -canvasH; offset < canvasW; offset += spacing){
+      ctx.beginPath();
+      ctx.moveTo(topLeft.x + offset, topLeft.y + canvasH);
+      ctx.lineTo(topLeft.x + offset + canvasH, topLeft.y);
+      ctx.stroke();
+    }
   } else {
-    // 未选中状态：灰色半透明填充，彩色边框
-    ctx.fillStyle = 'rgba(150,150,150,0.6)';
-    ctx.fillRect(topLeft.x, topLeft.y, canvasW, canvasH);
-    ctx.strokeStyle = `hsla(${(n * 37 + m * 73) % 360}, 80%, 60%, 0.8)`;
-    ctx.lineWidth = 2;
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.strokeRect(topLeft.x + 1, topLeft.y + 1, canvasW - 2, canvasH - 2);
-    ctx.restore();
+    for(let offset = 0; offset < canvasW + canvasH; offset += spacing){
+      ctx.beginPath();
+      ctx.moveTo(topLeft.x + offset, topLeft.y);
+      ctx.lineTo(topLeft.x + offset - canvasH, topLeft.y + canvasH);
+      ctx.stroke();
+    }
   }
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = getRectBorderColor(n, m);
+  ctx.lineWidth = isSelected ? 2.1 : 1.35;
+  ctx.strokeRect(
+    topLeft.x + 0.75,
+    topLeft.y + 0.75,
+    Math.max(0, canvasW - 1.5),
+    Math.max(0, canvasH - 1.5)
+  );
+
+  if(isSelected) {
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(
+      topLeft.x + 3,
+      topLeft.y + 3,
+      Math.max(0, canvasW - 6),
+      Math.max(0, canvasH - 6)
+    );
+  }
+  ctx.restore();
 }
 
 /**
@@ -305,9 +334,9 @@ function drawAll(){
   if(selectedRect) drawRect(selectedRect, true);
   
   // 绘制画布边框
-  ctx.strokeStyle = '#1f3b4f';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(0, 0, 500, 500);
+  ctx.strokeStyle = '#111111';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.75, 0.75, 498.5, 498.5);
   
   // 更新坐标轴标签和滚动条
   updateAxisLabels();

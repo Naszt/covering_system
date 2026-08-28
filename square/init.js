@@ -59,10 +59,17 @@ async function init(){
     suppressTextarea = false;
     
     // 解析默认值
-    parseTextareaAndLoad();
+    await parseTextareaAndLoad();
     
     // 保存到历史记录
     saveToHistory(ta.value);
+  }
+
+  const recursionDepth = document.getElementById('prefix-recursion-depth');
+  if(recursionDepth){
+    recursionDepth.addEventListener('change', () => {
+      if(textareaMode === 'expression') parseTextareaAndLoad();
+    });
   }
   
   // 更新网格大小显示

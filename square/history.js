@@ -7,13 +7,28 @@ let historyIndex = -1;     // 当前历史记录索引
 let isUndoRedoInProgress = false; // 是否正在进行撤销/重做操作
 let debounceTimer = null;   // 防抖定时器
 let suppressTextarea = false; // 防止文本区域事件循环
+let textareaMode = 'rectangles'; // rectangles 或 expression
+let expressionSource = '';
+let parseSequence = 0;
+
+function setParseMessage(message, error = false){
+  const element = document.getElementById('rect-parse-message');
+  if(!element) return;
+  element.textContent = message;
+  element.classList.toggle('error', error);
+}
+
+function switchTextareaToRectangleMode(){
+  textareaMode = 'rectangles';
+  expressionSource = '';
+}
 
 /**
  * 从矩形数据更新文本区域
  */
 function updateTextareaFromRects(){
   const ta = document.getElementById('rect-textarea');
-  if(!ta) return;
+  if(!ta || suppressTextarea || textareaMode === 'expression') return;
   
   suppressTextarea = true;
   ta.value = serializeRects();
@@ -89,31 +104,71 @@ function performRedo(){
 /**
  * 解析文本区域内容并加载矩形
  */
-function parseTextareaAndLoad(){
+async function parseTextareaAndLoad(){
   const ta = document.getElementById('rect-textarea');
   if(!ta || suppressTextarea) return;
+  const sequence = ++parseSequence;
   
   const raw = ta.value;
   if(!isUndoRedoInProgress) saveToHistory(raw);
-  
-  const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
-  
-  // 清空当前矩形
-  rectangles = []; 
-  nextId = 0; 
-  selectedId = null; 
-  isDragging = false;
-  
-  // 解析并添加每个矩形
-  for(const p of parts){
-    const parsed = parseEntryString(p);
-    if(parsed) addRectangle(parsed.n, parsed.m, parsed.x, parsed.y, false);
+
+  let parsedRectangles = null;
+  let prefixError = null;
+  try {
+    const depthInput = document.getElementById('prefix-recursion-depth');
+    const recursionDepth = depthInput ? Number(depthInput.value) : 6;
+    parsedRectangles = await CoveringPrefixRectangles.convert(raw, {
+      baseA: BASE_A,
+      baseB: BASE_B,
+      recursionDepth,
+      maximumRectangles: 10000
+    });
+    if(sequence !== parseSequence) return;
+    textareaMode = 'expression';
+    expressionSource = raw;
+    setParseMessage(`前缀表达式已展开为 ${parsedRectangles.length} 个矩形。`);
+  } catch(error) {
+    if(sequence !== parseSequence) return;
+    prefixError = error;
   }
-  
-  drawAll(); 
+
+  if(parsedRectangles === null) {
+    const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
+    const decoded = parts.map(parseEntryString);
+    if(parts.length && decoded.every(Boolean)) {
+      parsedRectangles = decoded;
+      switchTextareaToRectangleMode();
+      setParseMessage(`已读取 ${parsedRectangles.length} 个坐标编码。`);
+    } else if(!raw.trim()) {
+      parsedRectangles = [];
+      switchTextareaToRectangleMode();
+      setParseMessage('支持与树形覆盖相同的前缀表达式。');
+    } else {
+      setParseMessage(prefixError ? prefixError.message : '无法识别输入', true);
+      return;
+    }
+  }
+
+  rectangles = [];
+  nextId = 0;
+  selectedId = null;
+  isDragging = false;
+
+  parsedRectangles.forEach((rectangle) => {
+    const width = getRectWidth(rectangle.n);
+    const height = getRectHeight(rectangle.m);
+    if(
+      rectangle.x < 0 || rectangle.y < 0 ||
+      rectangle.x + width > 1 || rectangle.y + height > 1 ||
+      !canAddRectangle(rectangle.n, rectangle.m)
+    ) return;
+    rectangles.push({ id: nextId++, ...rectangle });
+  });
+
+  suppressTextarea = true;
+  drawAll();
   updateCount();
-  
-  // 如果当前形状无效，无需重置（保持当前选择）
+  suppressTextarea = false;
   drawMatrixGrid();
 }
 

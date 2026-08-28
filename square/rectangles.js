@@ -38,6 +38,8 @@ function addRectangle(n, m, x, y, autoSelect = true){
     console.log(`无法添加矩形 (${n},${m})，已达到使用上限或被禁用`);
     return 0;
   }
+
+  if(autoSelect) switchTextareaToRectangleMode();
   
   let id = nextId++;
   rectangles.push({id, n, m, x, y});
@@ -65,6 +67,8 @@ function moveRect(id, nx, ny, saveHistory = true){
   
   let w = getRectWidth(r.n), h = getRectHeight(r.m);
   if(nx < 0 || ny < 0 || nx + w > 1 || ny + h > 1) return;
+
+  switchTextareaToRectangleMode();
   
   r.x = nx; 
   r.y = ny; 
@@ -80,6 +84,7 @@ function moveRect(id, nx, ny, saveHistory = true){
  */
 function deleteSelected(){
   if(selectedId !== null){
+    switchTextareaToRectangleMode();
     rectangles = rectangles.filter(r => r.id !== selectedId);
     selectedId = null; 
     isDragging = false;
@@ -93,6 +98,7 @@ function deleteSelected(){
  * 清除所有矩形
  */
 function clearAll(){
+  switchTextareaToRectangleMode();
   rectangles = []; 
   selectedId = null; 
   isDragging = false;

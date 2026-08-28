@@ -1,265 +1,398 @@
-/* 
- * 覆盖系统可视化工具 - 主样式表
- * 该文件包含应用程序的所有样式定义
- */
+:root {
+  color-scheme: light;
+  --ink: #111111;
+  --soft-ink: #666666;
+  --line: #d8d8d8;
+  --pale: #f2f2f2;
+  --paper: #ffffff;
+  --accent: #315f7d;
+  --accent-soft: #edf3f6;
+}
 
-/* 全局重置和基础样式 */
 * {
   box-sizing: border-box;
-  user-select: none; /* 防止文本选择，提升交互体验 */
+  user-select: none;
 }
 
-/* 页面主体样式 */
+html {
+  min-width: 320px;
+  background: var(--paper);
+}
+
 body {
-  background: #f5f5f5; /* 浅灰色背景 */
-  min-height: 100vh; /* 至少占满整个视口高度 */
-  display: flex;
-  justify-content: center; /* 水平居中 */
-  align-items: center; /* 垂直居中 */
-  font-family: Segoe UI, Roboto, sans-serif; /* 字体栈 */
+  min-height: 100vh;
   margin: 0;
-  padding: 8px; /* 周围留白 */
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-/* 主容器 - 包含画布区域和矩阵面板 */
-.main {
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.topbar {
+  height: 58px;
   display: flex;
-  gap: 12px; /* 子元素间距 */
-  background: #ffffff; /* 白色背景 */
-  border-radius: 12px; /* 圆角 */
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 轻微阴影 */
-}
-
-/* 画布区域样式 */
-.canvas-area {
-  background: transparent;
-  border-radius: 6px;
-  padding: 6px;
-}
-
-/* 信息栏 - 显示覆盖率和元素个数 */
-.info {
-  display: flex;
-  justify-content: space-between; /* 两端对齐 */
-  margin-bottom: 6px;
-  color: #333;
-  padding: 0 6px;
-}
-
-/* 元素计数显示 */
-.count {
-  background: transparent;
-  padding: 1px 6px;
-  border-radius: 10px;
-  color: #333;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-/* 覆盖率显示 */
-.coverage {
-  background: transparent;
-  color: #333;
-  padding: 0;
-  margin: 0;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-/* 画布容器 */
-.holder {
-  position: relative;
-  width: 520px;
-  height: 520px;
-  background: transparent;
-  border-radius: 6px;
-}
-
-/* 主画布 */
-#canvas {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 500px;
-  height: 500px;
-  background: #ffffff;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  cursor: grab; /* 抓取光标 */
-}
-
-#canvas:active {
-  cursor: grabbing; /* 抓取中光标 */
-}
-
-/* 矩阵面板样式 */
-.matrix {
-  background: transparent;
-  border-radius: 6px;
-  padding: 4px 4px 4px 44px;
-  min-width: 200px;
-  max-height: 560px;
-  overflow-y: auto;
-  overflow-x: visible;
-}
-
-/* 矩阵画布 */
-.matrix canvas {
-  display: block;
-  margin: 0 auto;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-/* 操作按钮容器 */
-.acts {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-  justify-content: center;
-}
-
-/* 通用操作按钮样式 */
-.act {
-  background: #4a90e2; /* 蓝色背景 */
-  border: 0;
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.act:active {
-  transform: translateY(1px); /* 点击时轻微下移效果 */
-}
-
-/* 矩形文本输入区域 */
-textarea#rect-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  height: 120px;
-  padding: 6px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-  font-family: Consolas, monospace; /* 等宽字体，便于阅读代码 */
-  font-size: 0.8rem;
-  resize: vertical; /* 只允许垂直调整大小 */
-}
-
-/* 参数面板 - 用于设置底数a和b */
-.param-panel {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-bottom: 8px;
   align-items: center;
-  background: #f0f2f5; /* 浅灰色背景 */
-  padding: 6px;
-  border-radius: 8px;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 clamp(18px, 4vw, 56px);
+  border-bottom: 1px solid var(--line);
 }
 
-.param-panel label {
+.brand {
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
   font-weight: 600;
-  font-size: 0.8rem;
+  text-decoration: none;
 }
 
-.param-panel input {
-  width: 55px;
-  text-align: center;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px;
+.topbar nav {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  gap: 22px;
 }
 
-/* 滚动条容器 */
+.topbar nav a {
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  color: var(--soft-ink);
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.topbar nav a:hover,
+.topbar nav a.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.main {
+  width: fit-content;
+  max-width: calc(100% - 28px);
+  display: grid;
+  grid-template-columns: 544px minmax(270px, 320px);
+  gap: 28px;
+  margin: 28px auto 36px;
+  padding: 0;
+}
+
+.canvas-area {
+  min-width: 0;
+}
+
+.info {
+  min-height: 34px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 9px;
+  color: var(--ink);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.74rem;
+}
+
+.count,
+.coverage {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.holder,
 .scrollbar-container {
   position: relative;
   width: 520px;
   height: 520px;
 }
 
-/* 水平滚动条 */
+#canvas {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 500px;
+  height: 500px;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  cursor: grab;
+}
+
+#canvas:active {
+  cursor: grabbing;
+}
+
+.matrix {
+  min-width: 270px;
+  max-height: 580px;
+  padding: 0 4px 10px 44px;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  scrollbar-color: #bdbdbd transparent;
+}
+
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.workspace-nav a {
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  color: var(--soft-ink);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.workspace-nav a:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.param-panel {
+  display: grid;
+  grid-template-columns: auto 48px auto 48px 1fr;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 18px;
+  padding: 0;
+  background: transparent;
+}
+
+.param-panel label {
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.param-panel input {
+  width: 48px;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--paper);
+  text-align: center;
+}
+
+.act {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--accent);
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.act:hover {
+  color: var(--paper);
+  background: var(--accent);
+}
+
+.act:active {
+  transform: translateY(1px);
+}
+
+.matrix-controls {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 22px;
+}
+
+.matrix-controls .act {
+  width: 32px;
+  padding: 0;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 1rem;
+}
+
+.grid-size-label {
+  color: var(--soft-ink);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+#grid-size {
+  margin-left: 4px;
+  color: var(--ink);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-weight: 700;
+}
+
+.matrix-canvas-wrapper {
+  position: relative;
+  display: inline-block;
+  margin: 0 auto;
+  vertical-align: top;
+}
+
+#matrixCanvas,
+.matrix canvas {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.textarea-wrap {
+  margin: 18px 0 0;
+}
+
+textarea#rect-textarea {
+  width: 100%;
+  height: 118px;
+  display: block;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  user-select: text;
+}
+
+.expression-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 7px;
+  color: var(--soft-ink);
+  font-size: 0.64rem;
+}
+
+#rect-parse-message.error {
+  color: #a23d35;
+  font-weight: 650;
+}
+
+.expression-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.expression-tools input {
+  width: 42px;
+  height: 25px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--paper);
+  text-align: center;
+}
+
+.acts {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.action-row {
+  display: flex;
+  gap: 7px;
+}
+
+.action-row .act {
+  flex: 1;
+}
+
 .scrollbar-horizontal {
   position: absolute;
   top: 5px;
   left: 10px;
+  z-index: 10;
   width: 500px;
-  height: 5px;
-  z-index: 10; /* 确保在画布上方 */
+  height: 3px;
 }
 
-/* 垂直滚动条 */
 .scrollbar-vertical {
   position: absolute;
   top: 10px;
-  left: 510px;
-  width: 5px;
-  height: 500px;
+  left: 512px;
   z-index: 10;
+  width: 3px;
+  height: 500px;
 }
 
-/* 滚动条轨道 */
 .scrollbar-track-horizontal,
 .scrollbar-track-vertical {
-  background-color: #f0f0f0;
-  border-radius: 2px;
   position: relative;
   width: 100%;
   height: 100%;
+  background: #ececec;
 }
 
-/* 滚动条滑块 */
 .scrollbar-thumb-horizontal,
 .scrollbar-thumb-vertical {
-  background-color: #a0a0a0;
-  border-radius: 2px;
   position: absolute;
+  background: var(--accent);
   cursor: pointer;
 }
 
-.scrollbar-thumb-horizontal:hover,
-.scrollbar-thumb-vertical:hover {
-  background-color: #808080; /* 悬停时变深 */
-}
-
-/* 水平滑块 */
 .scrollbar-thumb-horizontal {
   height: 100%;
-  min-width: 20px; /* 最小宽度 */
+  min-width: 20px;
 }
 
-/* 垂直滑块 */
 .scrollbar-thumb-vertical {
   width: 100%;
-  min-height: 20px; /* 最小高度 */
+  min-height: 20px;
 }
 
-/* 坐标轴标签容器 */
 .axis-labels {
   position: absolute;
   z-index: 5;
-  pointer-events: none; /* 不拦截鼠标事件 */
-  font-family: monospace;
-  font-size: 11px;
-  color: #333;
+  color: var(--soft-ink);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 10px;
+  pointer-events: none;
 }
 
-/* Y轴标签 */
 .axis-labels.y-axis {
   left: -37px;
   top: 10px;
   width: 45px;
   height: 500px;
-  text-align: right;
   padding-right: 4px;
-  position: relative;
+  text-align: right;
 }
 
-/* X轴标签 */
 .axis-labels.x-axis {
   bottom: -1px;
   left: 16px;
@@ -268,126 +401,117 @@ textarea#rect-textarea {
   text-align: center;
 }
 
-/* 单个坐标轴标签 */
 .axis-label {
   position: absolute;
-  white-space: nowrap; /* 防止换行 */
+  white-space: nowrap;
 }
 
-/* Y轴标签右对齐 */
 .axis-labels.y-axis .axis-label {
   right: 0;
   text-align: right;
 }
 
-/* 矩阵控制区域的内联样式（在HTML中定义） */
-.matrix-controls {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin-bottom: 6px;
-  align-items: center;
-}
-
-/* 操作按钮的列布局 */
-.acts[style*="flex-direction: column"] {
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* 操作按钮的行内布局 */
-.acts[style*="flex-direction: column"] > div {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-}
-
-/* 矩阵画布包装器 */
-.matrix-canvas-wrapper {
-  position: relative;
-  display: inline-block;
-  vertical-align: top;
-  margin: 0 auto;
-}
-
-/* 矩阵坐标轴标签容器 - 覆盖原有定位 */
 .matrix-canvas-wrapper .axis-labels.y-axis {
+  position: absolute;
   left: -41px;
   top: 0;
   width: 40px;
   height: 100%;
-  text-align: right;
-  padding-right: 6px;
-  position: absolute;
+  padding-right: 7px;
 }
 
 .matrix-canvas-wrapper .axis-labels.x-axis {
-  top: -12px;
+  position: absolute;
+  top: -14px;
   left: 0;
   width: 100%;
   height: 12px;
-  text-align: center;
-  position: absolute;
 }
 
-/* 矩阵坐标轴标签内部span */
-.matrix-canvas-wrapper .axis-label {
-  position: absolute;
-  white-space: nowrap;
-}
-
-/* Y轴标签右对齐 */
-.matrix-canvas-wrapper .axis-labels.y-axis .axis-label {
-  right: 0;
-  text-align: right;
-}
-
-/* 关卡选择面板 */
 .level-panel {
-  background: #f0f2f5;
-  border-radius: 8px;
-  padding: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--paper);
 }
 
 .level-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 8px;
 }
 
 .level-btn {
-  background: #e0e0e0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  color: #333;
-  flex: 1;
   min-width: 60px;
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--accent);
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 0.7rem;
   text-align: center;
-  transition: background-color 0.2s;
 }
 
-.level-btn:hover {
-  background: #d0d0d0;
-}
-
+.level-btn:hover,
 .level-btn.active {
-  background: #4a90e2;
-  color: white;
-  border-color: #4a90e2;
+  color: var(--paper);
+  background: var(--accent);
 }
 
 .level-btn:disabled {
-  opacity: 0.5;
+  border-color: var(--line);
+  color: #999;
+  background: var(--pale);
   cursor: not-allowed;
 }
 
 #level-description {
-  font-size: 0.75rem;
-  color: #666;
-  line-height: 1.2;
+  color: var(--soft-ink);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 940px) {
+  .main {
+    width: min(560px, calc(100% - 24px));
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-area {
+    overflow-x: auto;
+    padding-left: 16px;
+  }
+
+  .matrix {
+    max-height: none;
+    padding: 26px 14px 12px 54px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .topbar {
+    height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 15px 0;
+  }
+
+  .topbar nav {
+    width: 100%;
+    height: 38px;
+  }
+
+  .main {
+    max-width: calc(100% - 12px);
+    margin-top: 18px;
+  }
+
+  .info {
+    width: 520px;
+  }
 }

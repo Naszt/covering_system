@@ -19,17 +19,16 @@ function drawMatrixGrid() {
       const isSelected = (currentShape.n === n && currentShape.m === m);
       const disabled = isRectangleDisabled(n, m);
 
-      // 背景色: 基于次数灰度，选中时覆盖一层淡黄
-      let bgColor = getCountColor(count);
+      // 色相表示矩形类型，颜色浓度表示该形状已使用的次数。
+      let bgColor = getCountColor(count, n, m);
       matrixCtx.fillStyle = bgColor;
       matrixCtx.fillRect(x, y, w-0.5, h-0.5);
 
-      // 禁用样式覆盖（半透明灰色背景 + 斜线）
+      // 禁用样式：浅灰底与黑色交叉线。
       if (disabled) {
-        matrixCtx.fillStyle = 'rgba(128,128,128,0.5)';
+        matrixCtx.fillStyle = 'rgba(0,0,0,0.13)';
         matrixCtx.fillRect(x, y, w-0.5, h-0.5);
-        // 绘制红色斜线
-        matrixCtx.strokeStyle = 'rgba(255,0,0,0.7)';
+        matrixCtx.strokeStyle = 'rgba(0,0,0,0.72)';
         matrixCtx.lineWidth = 1;
         matrixCtx.beginPath();
         matrixCtx.moveTo(x, y);
@@ -40,12 +39,10 @@ function drawMatrixGrid() {
       }
 
       if(isSelected && count===0 && !disabled) {
-        // 未使用时选中高亮
-        matrixCtx.fillStyle = '#ffe5b4';
+        matrixCtx.fillStyle = getRectColor(n, m, 0.2);
         matrixCtx.fillRect(x, y, w-0.5, h-0.5);
       } else if(isSelected && count>0 && !disabled) {
-        // 已使用时选中叠加半透黄
-        matrixCtx.fillStyle = 'rgba(255,229,180,0.6)';
+        matrixCtx.fillStyle = 'rgba(255,255,255,0.16)';
         matrixCtx.fillRect(x, y, w-0.5, h-0.5);
       }
 
@@ -54,10 +51,16 @@ function drawMatrixGrid() {
       matrixCtx.lineWidth = 1.5;
       matrixCtx.strokeRect(x+0.5, y+0.5, w-1, h-1);
 
+      if(isSelected && !disabled) {
+        matrixCtx.strokeStyle = '#111111';
+        matrixCtx.lineWidth = 2.5;
+        matrixCtx.strokeRect(x+2, y+2, w-4, h-4);
+      }
+
       // 显示次数数字（如果未被禁用）
       if(count > 0 && !disabled) {
         matrixCtx.font = 'bold 12px "Segoe UI", monospace';
-        matrixCtx.fillStyle = count >= 3 ? '#fff' : '#333';
+        matrixCtx.fillStyle = count >= 3 ? '#ffffff' : '#111111';
         matrixCtx.textAlign = 'center';
         matrixCtx.textBaseline = 'middle';
         matrixCtx.fillText(count.toString(), x + w/2, y + h/2);
